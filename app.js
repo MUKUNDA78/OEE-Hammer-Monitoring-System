@@ -44,7 +44,9 @@
     setupLiveCalculator();
     setupExcelDropZone();
     setupHammerMiniDropzones();
+    setupCloudDbSync();
     renderAllViews();
+    pullFromCloudDb(true);
   });
 
   /* ==========================================================================
@@ -354,6 +356,86 @@
     } else {
       shiftLogs = [];
       saveShiftLogs();
+    }
+  }
+
+  let cloudSyncTimer = null;
+  const defaultCloudEndpoint = 'https://raw.githubusercontent.com/MUKUNDA78/OEE-Hammer-Monitoring-System/master/shift_logs_db.json';
+
+  function getCloudEndpoint() {
+    const input = document.getElementById('cloudDbEndpointInput');
+    return (input && input.value.trim()) ? input.value.trim() : defaultCloudEndpoint;
+  }
+
+  function pullFromCloudDb(silent = false) {
+    const endpoint = getCloudEndpoint();
+    const pill = document.getElementById('cloudDbStatusPill');
+
+    if (pill) {
+      pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+    }
+
+    fetch(endpoint, { cache: 'no-cache' })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        let fetchedLogs = [];
+        if (Array.isArray(data)) {
+          fetchedLogs = data;
+        } else if (data && Array.isArray(data.shiftLogs)) {
+          fetchedLogs = data.shiftLogs;
+        }
+
+        if (fetchedLogs.length > 0) {
+          shiftLogs = fetchedLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+          saveShiftLogs();
+          renderAllViews();
+          if (!silent) showToast(`Online DB Synced! ${shiftLogs.length} logs loaded.`, 'success');
+        } else if (!silent) {
+          showToast('Online DB connected. Ready for multi-user shift uploads.', 'info');
+        }
+
+        if (pill) {
+          pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud"></i> Online DB (${shiftLogs.length} logs)`;
+          pill.style.borderColor = 'var(--primary)';
+        }
+      })
+      .catch(err => {
+        console.warn('Cloud DB pull failed:', err);
+        if (!silent) showToast('Local storage active. (Click Share Live Link to sync devices)', 'info');
+        if (pill) {
+          pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud-arrow-up"></i> Multi-User Share Active`;
+        }
+      });
+  }
+
+  function setupCloudDbSync() {
+    const syncHeaderBtn = document.getElementById('cloudDbSyncBtn');
+    const pullBtn = document.getElementById('pullFromCloudDbBtn');
+    const pushBtn = document.getElementById('pushToCloudDbBtn');
+    const autoSelect = document.getElementById('autoCloudSyncSelect');
+
+    if (syncHeaderBtn) syncHeaderBtn.addEventListener('click', () => pullFromCloudDb(false));
+    if (pullBtn) pullBtn.addEventListener('click', () => pullFromCloudDb(false));
+    if (pushBtn) pushBtn.addEventListener('click', () => generateShareableDataUrl());
+
+    if (autoSelect) {
+      autoSelect.addEventListener('change', () => {
+        if (cloudSyncTimer) clearInterval(cloudSyncTimer);
+        const val = autoSelect.value;
+        if (val !== 'OFF') {
+          const sec = parseInt(val, 10);
+          cloudSyncTimer = setInterval(() => pullFromCloudDb(true), sec * 1000);
+          showToast(`Auto Cloud Sync enabled every ${sec}s!`, 'info');
+        } else {
+          showToast('Auto Cloud Sync disabled. Use Manual Sync.', 'info');
+        }
+      });
+
+      // Start auto sync every 10 seconds default
+      cloudSyncTimer = setInterval(() => pullFromCloudDb(true), 10000);
     }
   }
 

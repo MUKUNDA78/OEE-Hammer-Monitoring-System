@@ -51,11 +51,17 @@
         <div class="status-pill active" title="3.5 Ton Hammer Status">
           <span class="dot"></span> 3.5 Ton
         </div>
+        <div class="status-pill active" id="cloudDbStatusPill" style="background: rgba(22, 163, 74, 0.15); border: 1px solid var(--primary); color: var(--primary);" title="Multi-User Online Cloud Database Sync">
+          <span class="dot"></span> <i class="fa-solid fa-database"></i> Cloud DB: Ready
+        </div>
       </div>
 
       <div class="header-actions">
+        <button class="btn btn-outline btn-sm" id="cloudDbSyncBtn" title="Sync Online Database Across Systems">
+          <i class="fa-solid fa-cloud-arrow-down"></i> Sync Online DB
+        </button>
         <button class="btn btn-success" id="shareDataLinkBtn" title="Share Live Data URL to open on other computers/devices">
-          <i class="fa-solid fa-share-nodes"></i> Share Live Data Link
+          <i class="fa-solid fa-share-nodes"></i> Share Live Link
         </button>
         <button class="btn btn-primary" id="openManualEntryBtn">
           <i class="fa-solid fa-plus"></i> Manual Entry
@@ -967,34 +973,39 @@
                 </div>
                 <button class="btn btn-secondary btn-sm" id="exportFullExcelBtn">
                   <i class="fa-solid fa-download"></i> Export Excel
+                  <i class="fa-solid fa-chart-line text-primary"></i>
+                </div>
+                <div class="export-details">
+                  <h4>5-Hammer Summary Report</h4>
+                  <p>Export aggregated Availability, Performance, Quality, and OEE totals for each hammer.</p>
+                </div>
+                <button class="btn btn-outline btn-sm" id="exportSummaryExcelBtn">
+                  <i class="fa-solid fa-download"></i> Export Summary
                 </button>
               </div>
 
               <div class="export-item">
                 <div class="export-icon">
-                  <i class="fa-solid fa-chart-pie text-info"></i>
+                  <i class="fa-solid fa-file-csv text-warning"></i>
                 </div>
                 <div class="export-details">
-                  <h4>5 Machine Summary Report</h4>
-                  <p>Export calculated OEE, Availability, Performance, and Downtime totals.</p>
+                  <h4>CSV Format Backup</h4>
+                  <p>Standard comma-separated backup file for legacy databases or ERP systems.</p>
                 </div>
-                <button class="btn btn-secondary btn-sm" id="exportSummaryExcelBtn">
-                  <i class="fa-solid fa-download"></i> Summary Report
+                <button class="btn btn-outline btn-sm" id="exportLogsCsvBtn">
+                  <i class="fa-solid fa-download"></i> Export CSV
                 </button>
               </div>
 
               <div class="export-item">
                 <div class="export-icon">
-                  <i class="fa-solid fa-database text-warning"></i>
+                  <i class="fa-solid fa-rotate-left text-info"></i>
                 </div>
                 <div class="export-details">
-                  <h4>System Data Reset / Restore</h4>
-                  <p>Reset data to original sample dataset or clear log history.</p>
+                  <h4>Reset / Clear Logs</h4>
+                  <p>Clear current logs or reload sample data dataset.</p>
                 </div>
-                <div class="btn-group">
-                  <button class="btn btn-outline btn-sm" id="reloadSampleDataBtn">
-                    <i class="fa-solid fa-arrows-rotate"></i> Reload Defaults
-                  </button>
+                <div style="display: flex; gap: 6px;">
                   <button class="btn btn-danger btn-sm" id="clearAllLogsBtn">
                     <i class="fa-solid fa-trash-can"></i> Clear All Logs
                   </button>
