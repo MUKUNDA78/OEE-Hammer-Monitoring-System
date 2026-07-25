@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forge OEE Monitor & Analysis System | 5 Hammer Fleet</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Chart.js & SheetJS XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Application CSS -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="light-green-theme">
+  <div class="app-wrapper">
+    
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-logo">
+          <i class="fa-solid fa-industry"></i>
+        </div>
+        <div class="brand-text">
+          <h1>FORGE<span>OEE</span> MONITOR</h1>
+          <p>5-Hammer Fleet Efficiency & Production Analytics</p>
+        </div>
+      </div>
+
+      <div class="header-fleet-status">
+        <div class="status-pill active" title="1 Ton Hammer Status">
+          <span class="dot"></span> 1 Ton
+        </div>
+        <div class="status-pill active" title="1.5 Ton Hammer Status">
+          <span class="dot"></span> 1.5 Ton
+        </div>
+        <div class="status-pill warning" title="2.5 Ton (Old) Hammer Status">
+          <span class="dot"></span> 2.5T Old
+        </div>
+        <div class="status-pill active" title="2.5 Ton (New) Hammer Status">
+          <span class="dot"></span> 2.5T New
+        </div>
+        <div class="status-pill active" title="3.5 Ton Hammer Status">
+          <span class="dot"></span> 3.5 Ton
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-primary" id="openManualEntryBtn">
+          <i class="fa-solid fa-plus"></i> Manual Entry
+        </button>
+        <button class="btn btn-secondary" id="openExcelModalBtn">
+          <i class="fa-solid fa-file-excel"></i> Excel Import
+        </button>
+        <button class="btn btn-danger btn-sm" id="clearDemoDataHeaderBtn" title="Clear Sample Demo Data">
+          <i class="fa-solid fa-trash"></i> Clear Demo Data
+        </button>
+        <button class="btn btn-icon" id="themeToggleBtn" title="Toggle Light Green / Dark Theme">
+          <i class="fa-solid fa-leaf"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Navigation Bar -->
+    <nav class="main-nav">
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="overview">
+          <i class="fa-solid fa-gauge-high"></i> Dashboard Overview
+        </button>
+        <button class="nav-tab" data-tab="insights">
+          <i class="fa-solid fa-magnifying-glass-chart"></i> Part & Machine Insights
+        </button>
+        <button class="nav-tab" data-tab="comparison">
+          <i class="fa-solid fa-code-compare"></i> 5-Hammer Comparison
+        </button>
+        <button class="nav-tab" data-tab="downtime">
+          <i class="fa-solid fa-triangle-exclamation"></i> Downtime & Pareto
+        </button>
+        <button class="nav-tab" data-tab="entry">
+          <i class="fa-solid fa-pen-to-square"></i> Manual Entry Form
+        </button>
+        <button class="nav-tab" data-tab="excel">
+          <i class="fa-solid fa-file-import"></i> Excel Import / Export
+        </button>
+        <button class="nav-tab" data-tab="logs">
+          <i class="fa-solid fa-table-list"></i> Shift Logs Table
+        </button>
+      </div>
+
+      <div class="nav-filters">
+        <div class="filter-group">
+          <label><i class="fa-solid fa-hammer"></i> Machine / Hammer:</label>
+          <select id="globalHammerFilter">
+            <option value="ALL">All Machines (5)</option>
+            <option value="1 Ton Hammer">1 Ton Hammer</option>
+            <option value="1.5 Ton Hammer">1.5 Ton Hammer</option>
+            <option value="2.5 Ton (Old) Hammer">2.5 Ton (Old) Hammer</option>
+            <option value="2.5 Ton (New) Hammer">2.5 Ton (New) Hammer</option>
+            <option value="3.5 Ton Hammer">3.5 Ton Hammer</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label><i class="fa-solid fa-clock"></i> Shift (2 x 12h):</label>
+          <select id="globalShiftFilter">
+            <option value="ALL">All Shifts</option>
+            <option value="Shift A">Shift A (08:00 - 20:00)</option>
+            <option value="Shift B">Shift B (20:00 - 08:00)</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label><i class="fa-solid fa-calendar-days"></i> Select Month:</label>
+          <select id="globalRangeFilter">
+            <option value="ALL" selected>All Months (Combined)</option>
+            <option value="2026-07">Jul 2026</option>
+            <option value="2026-06">Jun 2026</option>
+            <option value="2026-05">May 2026</option>
+            <option value="2026-04">Apr 2026</option>
+            <option value="2026-03">Mar 2026</option>
+            <option value="2026-02">Feb 2026</option>
+            <option value="2026-01">Jan 2026</option>
+          </select>
+        </div>
+        
+        <button class="btn btn-outline btn-sm" id="resetFiltersBtn" title="Reset Filters">
+          <i class="fa-solid fa-rotate-left"></i> Reset
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content Body -->
+    <main class="content-body">
+
+      <!-- TAB 1: OVERVIEW -->
+      <section class="tab-content active" id="tab-overview">
+        
+        <!-- Shift Schedule Banner -->
+        <div class="shift-schedule-banner">
+          <div class="schedule-pill"><i class="fa-solid fa-sun text-warning"></i> <strong>Shift A:</strong> 08:00 - 20:00 (12 Hours)</div>
+          <div class="schedule-pill"><i class="fa-solid fa-moon text-info"></i> <strong>Shift B:</strong> 20:00 - 08:00 (12 Hours)</div>
+          <div class="schedule-pill break"><i class="fa-solid fa-utensils"></i> <strong>Lunch Break:</strong> 30 Mins</div>
+          <div class="schedule-pill break"><i class="fa-solid fa-mug-hot"></i> <strong>Tea Breaks:</strong> 30 Mins (2 x 15m)</div>
+          <div class="schedule-pill highlight"><i class="fa-solid fa-stopwatch"></i> <strong>Net Planned Prod Time:</strong> 660 Mins (11 Hours)</div>
+        </div>
+
+        <!-- Summary Metric Cards -->
+        <div class="metrics-grid mt-3">
+          <div class="metric-card primary">
+            <div class="metric-icon">
+              <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">Fleet Average OEE</span>
+              <div class="metric-value" id="kpiOverallOee">--%</div>
+              <span class="metric-subtitle" id="kpiOeeStatus"><i class="fa-solid fa-circle-check"></i> Target: 75.0%</span>
+            </div>
+          </div>
+
+          <div class="metric-card success">
+            <div class="metric-icon">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">Availability Rate</span>
+              <div class="metric-value" id="kpiAvailability">--%</div>
+              <span class="metric-subtitle" id="kpiPlannedHours">Net Planned: -- hrs</span>
+            </div>
+          </div>
+
+          <div class="metric-card info">
+            <div class="metric-icon">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">Performance Rate</span>
+              <div class="metric-value" id="kpiPerformance">--%</div>
+              <span class="metric-subtitle" id="kpiTotalPieces">Good Parts: -- pcs</span>
+            </div>
+          </div>
+
+          <div class="metric-card warning">
+            <div class="metric-icon">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">Quality Rate</span>
+              <div class="metric-value" id="kpiQuality">--%</div>
+              <span class="metric-subtitle" id="kpiScrapRate">Rejects: -- pcs (--%)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Executive Summary Banner -->
+        <div class="executive-summary-banner mt-4">
+          <div class="summary-header">
+            <h3><i class="fa-solid fa-bullseye"></i> Executive Key Insights Summary (2 x 12h Shifts | Net 660m)</h3>
+            <span class="badge badge-success">Automated Root Cause Diagnostics</span>
+          </div>
+          <div class="summary-grid">
+            <div class="summary-item warning">
+              <div class="item-icon"><i class="fa-solid fa-wrench"></i></div>
+              <div class="item-text">
+                <span class="item-title">Highest Maintenance Machine</span>
+                <strong id="summaryHighestMaintMachine">Loading...</strong>
+                <p id="summaryHighestMaintVal">0 mins total downtime</p>
+              </div>
+            </div>
+
+            <div class="summary-item primary">
+              <div class="item-icon"><i class="fa-solid fa-sliders"></i></div>
+              <div class="item-text">
+                <span class="item-title">Highest Setup Time Part No.</span>
+                <strong id="summaryHighestSetupPart">Loading...</strong>
+                <p id="summaryHighestSetupVal">0 mins setup loss</p>
+              </div>
+            </div>
+
+            <div class="summary-item danger">
+              <div class="item-icon"><i class="fa-solid fa-cubes-stacked"></i></div>
+              <div class="item-text">
+                <span class="item-title">Most Die-Related Issues Part No.</span>
+                <strong id="summaryHighestDiePart">Loading...</strong>
+                <p id="summaryHighestDieVal">0 mins die downtime</p>
+              </div>
+            </div>
+
+            <div class="summary-item info">
+              <div class="item-icon"><i class="fa-solid fa-fire-burner"></i></div>
+              <div class="item-text">
+                <span class="item-title">Highest Heating Time Part No.</span>
+                <strong id="summaryHighestHeatingPart">Loading...</strong>
+                <p id="summaryHighestHeatingVal">0 mins heating wait</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 Hammer Visual Gauge Cards -->
+        <div class="section-header mt-4">
+          <h2><i class="fa-solid fa-gauge"></i> Real-Time Machine Status & OEE Gauges</h2>
+          <span class="badge badge-info">World-Class Target: 85% | Plant Benchmark: 75%</span>
+        </div>
+
+        <div class="hammer-gauges-grid" id="hammerGaugesContainer">
+          <!-- Rendered dynamically by JS for 5 hammers -->
+        </div>
+
+        <!-- Daily Charts Grid -->
+        <div class="charts-grid mt-4">
+          <div class="chart-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-chart-line"></i> Daily OEE Trend by Machine</h3>
+              <div class="card-actions">
+                <span class="legend-indicator"><span class="color-box target"></span> Target 75%</span>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="oeeTrendChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-chart-pie"></i> OEE Factor Breakdown (A x P x Q)</h3>
+            </div>
+            <div class="chart-container">
+              <canvas id="oeeComponentsChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Month-Wise OEE Trend Section (Overall Fleet & Each Hammer) -->
+        <div class="card mt-4">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3><i class="fa-solid fa-calendar-days text-primary"></i> Month-Wise OEE Trend (Overall Fleet & Each Hammer)</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Monthly aggregated OEE performance trend for each hammer and overall fleet average</p>
+            </div>
+            <div class="card-actions">
+              <span class="badge badge-success"><i class="fa-solid fa-chart-area"></i> Monthly Analytics</span>
+            </div>
+          </div>
+
+          <div class="chart-container mt-3" style="height: 340px; position: relative;">
+            <canvas id="monthlyTrendChart"></canvas>
+          </div>
+
+          <!-- Monthly Performance Breakdown Table -->
+          <div class="table-responsive mt-4">
+            <h4 style="font-size: 14px; margin-bottom: 12px; color: var(--primary);"><i class="fa-solid fa-table"></i> Month-by-Month Hammer Performance Matrix</h4>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Total Shifts</th>
+                  <th>Good Parts</th>
+                  <th>Overall Fleet OEE</th>
+                  <th>1 Ton OEE</th>
+                  <th>1.5 Ton OEE</th>
+                  <th>2.5T Old OEE</th>
+                  <th>2.5T New OEE</th>
+                  <th>3.5 Ton OEE</th>
+                </tr>
+              </thead>
+              <tbody id="monthlyTrendTableBody">
+                <!-- Rendered dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: PART & MACHINE INSIGHTS -->
+      <section class="tab-content" id="tab-insights">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Part Number & Machine Analysis (Hammer-Wise Breakdown)</h2>
+          <p>Detailed Part Number performance, Setup Time, Die Downtime, and Heating Delays analyzed specifically for each Hammer</p>
+        </div>
+
+        <!-- Hammer Wise Interactive Selector Sub-Nav -->
+        <div class="hammer-subnav-bar mb-4">
+          <span class="subnav-title"><i class="fa-solid fa-filter"></i> Select Machine Breakdown:</span>
+          <div class="hammer-subnav-btns">
+            <button class="subnav-btn active" data-hammer="ALL">
+              <i class="fa-solid fa-layer-group"></i> All 5 Hammers Combined
+            </button>
+            <button class="subnav-btn" data-hammer="1 Ton Hammer">
+              <i class="fa-solid fa-hammer text-primary"></i> 1 Ton Hammer
+            </button>
+            <button class="subnav-btn" data-hammer="1.5 Ton Hammer">
+              <i class="fa-solid fa-hammer text-purple"></i> 1.5 Ton Hammer
+            </button>
+            <button class="subnav-btn" data-hammer="2.5 Ton (Old) Hammer">
+              <i class="fa-solid fa-hammer text-warning"></i> 2.5 Ton (Old) Hammer
+            </button>
+            <button class="subnav-btn" data-hammer="2.5 Ton (New) Hammer">
+              <i class="fa-solid fa-hammer text-success"></i> 2.5 Ton (New) Hammer
+            </button>
+            <button class="subnav-btn" data-hammer="3.5 Ton Hammer">
+              <i class="fa-solid fa-hammer text-pink"></i> 3.5 Ton Hammer
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid 1: Setup Time & Die Related Issues by Part Number -->
+        <div class="grid-2-col">
+          
+          <!-- Card 1: Setup Time by Part Number -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-sliders text-primary"></i> 1. Setup Time Analysis by Part Number</h3>
+              <span class="badge badge-primary" id="setupBadgeLabel">All Hammers Combined</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="partSetupChart"></canvas>
+            </div>
+            <div class="table-responsive mt-3">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Part Number</th>
+                    <th>Total Setup (mins)</th>
+                    <th>Avg / Shift</th>
+                    <th>Impact Level</th>
+                  </tr>
+                </thead>
+                <tbody id="partSetupTableBody">
+                  <!-- JS populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 2: Die Related Issues by Part Number -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-cubes-stacked text-danger"></i> 2. Die Related Downtime by Part Number</h3>
+              <span class="badge badge-danger" id="dieBadgeLabel">All Hammers Combined</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="partDieChart"></canvas>
+            </div>
+            <div class="table-responsive mt-3">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Part Number</th>
+                    <th>Die Downtime (mins)</th>
+                    <th>Avg / Shift</th>
+                    <th>Impact Level</th>
+                  </tr>
+                </thead>
+                <tbody id="partDieTableBody">
+                  <!-- JS populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Grid 2: Heating Time by Part Number & Maintenance by Machine -->
+        <div class="grid-2-col mt-4">
+          
+          <!-- Card 3: Heating Time by Part Number -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-fire-burner text-info"></i> 3. Heating Time Analysis by Part Number</h3>
+              <span class="badge badge-info" id="heatingBadgeLabel">All Hammers Combined</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="partHeatingChart"></canvas>
+            </div>
+            <div class="table-responsive mt-3">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Part Number</th>
+                    <th>Heating Delay (mins)</th>
+                    <th>Avg / Shift</th>
+                    <th>Impact Level</th>
+                  </tr>
+                </thead>
+                <tbody id="partHeatingTableBody">
+                  <!-- JS populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 4: Maintenance Downtime by Machine -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-wrench text-warning"></i> 4. Machine Maintenance Breakdown</h3>
+              <span class="badge badge-warning">Breakdowns & Electrical Repairs</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="machineMaintenanceChart"></canvas>
+            </div>
+            <div class="table-responsive mt-3">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Machine / Hammer</th>
+                    <th>Maintenance (mins)</th>
+                    <th>Total Shifts</th>
+                    <th>Reliability Score</th>
+                  </tr>
+                </thead>
+                <tbody id="machineMaintenanceTableBody">
+                  <!-- JS populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Dedicated 5-Hammer Part Summary Cards Grid -->
+        <div class="section-header mt-5">
+          <h2><i class="fa-solid fa-cubes"></i> 5 Hammers Specific Part Allocation & Downtime Hotspots Summary</h2>
+        </div>
+
+        <div class="hammer-wise-cards-grid mt-3" id="hammerWiseCardsContainer">
+          <!-- Dynamically populated by JS for all 5 hammers -->
+        </div>
+
+      </section>
+
+      <!-- TAB 3: 5-HAMMER COMPARISON -->
+      <section class="tab-content" id="tab-comparison">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-scale-balanced"></i> 5 Machine Performance Benchmark & Ranking</h2>
+          <p>Side-by-side comparative analysis across capacity sizes</p>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card full-width">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-chart-column"></i> OEE & Factor Comparison Across 5 Machines</h3>
+            </div>
+            <div class="chart-container tall">
+              <canvas id="hammerComparisonChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-table"></i> Machine Fleet Comparative Matrix</h3>
+            <button class="btn btn-sm btn-outline" id="exportComparisonCsv">
+              <i class="fa-solid fa-download"></i> Export Comparison
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="comparisonTable">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Machine / Hammer</th>
+                  <th>Capacity</th>
+                  <th>Shift Logs</th>
+                  <th>Planned Hrs</th>
+                  <th>Operating Hrs</th>
+                  <th>Total Downtime (hrs)</th>
+                  <th>Total Parts</th>
+                  <th>Good Parts</th>
+                  <th>Rejects</th>
+                  <th>Availability</th>
+                  <th>Performance</th>
+                  <th>Quality</th>
+                  <th>Overall OEE</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="comparisonTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: DOWNTIME & PARETO ANALYSIS -->
+      <section class="tab-content" id="tab-downtime">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-triangle-exclamation"></i> Detailed Downtime Losses & Pareto Analysis</h2>
+          <p>Root-cause breakdown across Maintenance, Die Related, Setup, No Manpower, Heating Time, and Minor Stops</p>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card full-width">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-chart-column"></i> Downtime Reason Pareto Chart (Mins & Cumulative %)</h3>
+            </div>
+            <div class="chart-container tall">
+              <canvas id="downtimeParetoChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2-col mt-4">
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-sitemap"></i> Specific Downtime Category Totals</h3>
+            </div>
+            <div class="six-losses-tree" id="sixLossesContainer">
+              <div class="loss-category availability">
+                <div class="loss-header">
+                  <i class="fa-solid fa-wrench"></i>
+                  <h4>1. Maintenance Downtime</h4>
+                  <span class="loss-total" id="catMaintance">0 mins</span>
+                </div>
+                <p class="loss-desc">Mechanical & Electrical failures, breakdown repairs</p>
+              </div>
+
+              <div class="loss-category availability">
+                <div class="loss-header">
+                  <i class="fa-solid fa-cubes-stacked"></i>
+                  <h4>2. Die Related Downtime</h4>
+                  <span class="loss-total" id="catDieRelated">0 mins</span>
+                </div>
+                <p class="loss-desc">Die changeover, die alignment, die damage & dressing</p>
+              </div>
+
+              <div class="loss-category performance">
+                <div class="loss-header">
+                  <i class="fa-solid fa-sliders"></i>
+                  <h4>3. Setup Time</h4>
+                  <span class="loss-total" id="catSetup">0 mins</span>
+                </div>
+                <p class="loss-desc">Job setup, trial forging, temperature & height adjustments</p>
+              </div>
+
+              <div class="loss-category performance">
+                <div class="loss-header">
+                  <i class="fa-solid fa-user-slash"></i>
+                  <h4>4. No Manpower</h4>
+                  <span class="loss-total" id="catNoManpower">0 mins</span>
+                </div>
+                <p class="loss-desc">Operator absenteeism, shift handover delays, crew shortages</p>
+              </div>
+
+              <div class="loss-category quality">
+                <div class="loss-header">
+                  <i class="fa-solid fa-fire-burner"></i>
+                  <h4>5. Heating Time</h4>
+                  <span class="loss-total" id="catHeatingTime">0 mins</span>
+                </div>
+                <p class="loss-desc">Furnace heating delay, billet temperature waiting</p>
+              </div>
+
+              <div class="loss-category quality">
+                <div class="loss-header">
+                  <i class="fa-solid fa-circle-pause"></i>
+                  <h4>6. Minor Stops</h4>
+                  <span class="loss-total" id="catMinorStop">0 mins</span>
+                </div>
+                <p class="loss-desc">Billet jam, scale clearing, short interruptions (<5 mins)</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-chart-bar"></i> Total Downtime Distribution by Machine</h3>
+            </div>
+            <div class="chart-container">
+              <canvas id="downtimeByHammerChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: MANUAL ENTRY FORM -->
+      <section class="tab-content" id="tab-entry">
+        <div class="form-container-wrapper">
+          <div class="card form-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-file-pen"></i> Shift Data Entry Form (12h Shifts | Planned Breaks Excluded)</h3>
+              <span class="badge badge-primary">Auto-Calculates Net Planned Time (660m) & Downtimes</span>
+            </div>
+
+            <form id="manualEntryForm" class="entry-form">
+              
+              <!-- Section 1: Header Info & Break Accounting -->
+              <h4 class="form-section-title"><i class="fa-solid fa-list"></i> 1. Shift & Planned Break Accounting</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="entryDate">Date <span class="required">*</span></label>
+                  <input type="date" id="entryDate" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryShift">Shift (12h) <span class="required">*</span></label>
+                  <select id="entryShift" required>
+                    <option value="Shift A">Shift A (08:00 - 20:00)</option>
+                    <option value="Shift B">Shift B (20:00 - 08:00)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryMachine">Machine / Hammer <span class="required">*</span></label>
+                  <select id="entryMachine" required>
+                    <option value="">-- Select Machine --</option>
+                    <option value="1 Ton Hammer">1 Ton Hammer</option>
+                    <option value="1.5 Ton Hammer">1.5 Ton Hammer</option>
+                    <option value="2.5 Ton (Old) Hammer">2.5 Ton (Old) Hammer</option>
+                    <option value="2.5 Ton (New) Hammer">2.5 Ton (New) Hammer</option>
+                    <option value="3.5 Ton Hammer">3.5 Ton Hammer</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryPart">Part Number <span class="required">*</span></label>
+                  <input type="text" id="entryPart" placeholder="e.g. A1#21" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryGrossPlanned">Gross Shift Time (mins)</label>
+                  <input type="number" id="entryGrossPlanned" value="720" readonly style="background: var(--bg-card-hover);">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryLunchBreak">Lunch Break (mins)</label>
+                  <input type="number" id="entryLunchBreak" value="30" min="0" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryTeaBreak">Tea Breaks (2 x 15m = mins)</label>
+                  <input type="number" id="entryTeaBreak" value="30" min="0" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryPlannedTime">Net Planned Operating Time (mins) [Base: 11.0 Hours = 660m]</label>
+                  <input type="number" id="entryPlannedTime" min="60" value="660" readonly style="background: var(--bg-card-hover); font-weight: bold; color: var(--primary);">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryIdealCycle">Ideal Cycle Time (sec/pc) <span class="required">*</span></label>
+                  <input type="number" id="entryIdealCycle" step="0.1" min="1" value="45" required placeholder="e.g. 45">
+                </div>
+              </div>
+
+              <!-- Section 2: Detailed Plant Downtime Breakdown -->
+              <h4 class="form-section-title mt-3"><i class="fa-solid fa-clock-rotate-left"></i> 2. Unplanned Plant Downtime Breakdown (Minutes)</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="entryMaintance">Maintance (mins)</label>
+                  <input type="number" id="entryMaintance" min="0" value="20" placeholder="Mechanical/Electrical">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryDieRelated">Die Related (mins)</label>
+                  <input type="number" id="entryDieRelated" min="0" value="25" placeholder="Die change/alignment">
+                </div>
+
+                <div class="form-group">
+                  <label for="entrySetup">Setup (mins)</label>
+                  <input type="number" id="entrySetup" min="0" value="15" placeholder="Trial & adjustment">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryNoManpower">No Manpower (mins)</label>
+                  <input type="number" id="entryNoManpower" min="0" value="0" placeholder="Operator shortage">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryHeatingTime">Heating Time (mins)</label>
+                  <input type="number" id="entryHeatingTime" min="0" value="15" placeholder="Furnace heating wait">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryMinorStop">Minor Stop (mins)</label>
+                  <input type="number" id="entryMinorStop" min="0" value="10" placeholder="Small interruptions">
+                </div>
+              </div>
+
+              <!-- Section 3: Production Quantities -->
+              <h4 class="form-section-title mt-3"><i class="fa-solid fa-boxes-stacked"></i> 3. Production Quantities</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="entryTotalParts">Total Parts (pcs) <span class="required">*</span></label>
+                  <input type="number" id="entryTotalParts" min="0" value="700" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryRejects">Rejects / Scrap (pcs) <span class="required">*</span></label>
+                  <input type="number" id="entryRejects" min="0" value="15" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryGoodParts">Good Parts (pcs) [Auto Calculated]</label>
+                  <input type="number" id="entryGoodParts" readonly value="685" style="background: var(--bg-card-hover); font-weight: bold;">
+                </div>
+              </div>
+
+              <!-- Live OEE Calculation Preview -->
+              <div class="oee-live-calculator mt-3">
+                <h4><i class="fa-solid fa-calculator"></i> Real-Time Computed OEE Results (Base: Net 660m = 11 Hours)</h4>
+                <div class="calc-grid">
+                  <div class="calc-item">
+                    <span>Total Downtime:</span>
+                    <strong id="calcTotalDowntime" style="color: var(--danger);">85 mins</strong>
+                  </div>
+                  <div class="calc-item">
+                    <span>Net Operating Time:</span>
+                    <strong id="calcOperatingTime">575 mins</strong>
+                  </div>
+                  <div class="calc-item">
+                    <span>Availability (A):</span>
+                    <strong id="calcAvailability" class="val-good">87.1%</strong>
+                  </div>
+                  <div class="calc-item">
+                    <span>Performance (P):</span>
+                    <strong id="calcPerformance" class="val-good">91.3%</strong>
+                  </div>
+                  <div class="calc-item">
+                    <span>Quality (Q):</span>
+                    <strong id="calcQuality" class="val-good">97.9%</strong>
+                  </div>
+                  <div class="calc-item highlight">
+                    <span>Computed OEE:</span>
+                    <strong id="calcOee" class="val-good">77.9%</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">
+                  <i class="fa-solid fa-floppy-disk"></i> Save Shift Record
+                </button>
+                <button type="reset" class="btn btn-secondary btn-lg" id="resetEntryFormBtn">
+                  <i class="fa-solid fa-eraser"></i> Clear Form
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: EXCEL IMPORT & EXPORT -->
+      <section class="tab-content" id="tab-excel">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-file-excel"></i> Excel Integration: Hammer-Wise & Combined Uploads</h2>
+          <p>Upload Excel sheets separately for each hammer, or import a single combined fleet file</p>
+        </div>
+
+        <!-- 5 Hammer-Wise Separate Excel Upload Cards Section -->
+        <div class="section-header mt-2">
+          <h3><i class="fa-solid fa-hammer"></i> Option 1: Upload Excel Sheet Separately for Each Hammer</h3>
+          <span class="badge badge-success">Individual Machine Sheets</span>
+        </div>
+
+        <div class="hammer-upload-cards-grid mt-3">
+          
+          <!-- Card 1: 1 Ton Hammer -->
+          <div class="card hammer-upload-card">
+            <div class="card-header">
+              <h4><i class="fa-solid fa-hammer text-primary"></i> 1 Ton Hammer</h4>
+              <span class="badge badge-info" id="countBadge_1Ton">0 logs</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted);">Upload Excel sheet containing shift logs specifically for 1 Ton Hammer.</p>
+            <div class="excel-mini-dropzone" data-hammer="1 Ton Hammer">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Drop Excel here for 1 Ton</span>
+              <button class="btn btn-sm btn-primary mt-2" onclick="triggerHammerExcelBrowse('1 Ton Hammer')">
+                <i class="fa-solid fa-folder-open"></i> Browse 1 Ton Sheet
+              </button>
+            </div>
+            <button class="btn btn-outline btn-xs mt-2 w-100" onclick="downloadHammerTemplate('1 Ton Hammer')">
+              <i class="fa-solid fa-download"></i> 1 Ton Template (.xlsx)
+            </button>
+          </div>
+
+          <!-- Card 2: 1.5 Ton Hammer -->
+          <div class="card hammer-upload-card">
+            <div class="card-header">
+              <h4><i class="fa-solid fa-hammer text-purple"></i> 1.5 Ton Hammer</h4>
+              <span class="badge badge-info" id="countBadge_1.5Ton">0 logs</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted);">Upload Excel sheet containing shift logs specifically for 1.5 Ton Hammer.</p>
+            <div class="excel-mini-dropzone" data-hammer="1.5 Ton Hammer">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Drop Excel here for 1.5 Ton</span>
+              <button class="btn btn-sm btn-primary mt-2" onclick="triggerHammerExcelBrowse('1.5 Ton Hammer')">
+                <i class="fa-solid fa-folder-open"></i> Browse 1.5 Ton Sheet
+              </button>
+            </div>
+            <button class="btn btn-outline btn-xs mt-2 w-100" onclick="downloadHammerTemplate('1.5 Ton Hammer')">
+              <i class="fa-solid fa-download"></i> 1.5 Ton Template (.xlsx)
+            </button>
+          </div>
+
+          <!-- Card 3: 2.5 Ton (Old) Hammer -->
+          <div class="card hammer-upload-card">
+            <div class="card-header">
+              <h4><i class="fa-solid fa-hammer text-warning"></i> 2.5 Ton (Old) Hammer</h4>
+              <span class="badge badge-info" id="countBadge_2.5TonOld">0 logs</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted);">Upload Excel sheet containing shift logs specifically for 2.5 Ton (Old) Hammer.</p>
+            <div class="excel-mini-dropzone" data-hammer="2.5 Ton (Old) Hammer">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Drop Excel here for 2.5T Old</span>
+              <button class="btn btn-sm btn-primary mt-2" onclick="triggerHammerExcelBrowse('2.5 Ton (Old) Hammer')">
+                <i class="fa-solid fa-folder-open"></i> Browse 2.5T Old Sheet
+              </button>
+            </div>
+            <button class="btn btn-outline btn-xs mt-2 w-100" onclick="downloadHammerTemplate('2.5 Ton (Old) Hammer')">
+              <i class="fa-solid fa-download"></i> 2.5T Old Template (.xlsx)
+            </button>
+          </div>
+
+          <!-- Card 4: 2.5 Ton (New) Hammer -->
+          <div class="card hammer-upload-card">
+            <div class="card-header">
+              <h4><i class="fa-solid fa-hammer text-success"></i> 2.5 Ton (New) Hammer</h4>
+              <span class="badge badge-info" id="countBadge_2.5TonNew">0 logs</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted);">Upload Excel sheet containing shift logs specifically for 2.5 Ton (New) Hammer.</p>
+            <div class="excel-mini-dropzone" data-hammer="2.5 Ton (New) Hammer">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Drop Excel here for 2.5T New</span>
+              <button class="btn btn-sm btn-primary mt-2" onclick="triggerHammerExcelBrowse('2.5 Ton (New) Hammer')">
+                <i class="fa-solid fa-folder-open"></i> Browse 2.5T New Sheet
+              </button>
+            </div>
+            <button class="btn btn-outline btn-xs mt-2 w-100" onclick="downloadHammerTemplate('2.5 Ton (New) Hammer')">
+              <i class="fa-solid fa-download"></i> 2.5T New Template (.xlsx)
+            </button>
+          </div>
+
+          <!-- Card 5: 3.5 Ton Hammer -->
+          <div class="card hammer-upload-card">
+            <div class="card-header">
+              <h4><i class="fa-solid fa-hammer text-pink"></i> 3.5 Ton Hammer</h4>
+              <span class="badge badge-info" id="countBadge_3.5Ton">0 logs</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted);">Upload Excel sheet containing shift logs specifically for 3.5 Ton Hammer.</p>
+            <div class="excel-mini-dropzone" data-hammer="3.5 Ton Hammer">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Drop Excel here for 3.5 Ton</span>
+              <button class="btn btn-sm btn-primary mt-2" onclick="triggerHammerExcelBrowse('3.5 Ton Hammer')">
+                <i class="fa-solid fa-folder-open"></i> Browse 3.5 Ton Sheet
+              </button>
+            </div>
+            <button class="btn btn-outline btn-xs mt-2 w-100" onclick="downloadHammerTemplate('3.5 Ton Hammer')">
+              <i class="fa-solid fa-download"></i> 3.5 Ton Template (.xlsx)
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Hidden input for machine specific upload -->
+        <input type="file" id="hammerFileInput" accept=".xlsx, .xls, .csv" style="display: none;">
+
+        <!-- Option 2: Combined Excel Upload & Export Section -->
+        <div class="grid-2-col mt-4">
+          
+          <!-- Drop Area & Template Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-upload"></i> Option 2: Upload Combined Fleet Sheet (All 5 Hammers)</h3>
+            </div>
+            
+            <div class="excel-drop-zone" id="excelDropZone">
+              <div class="drop-icon">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+              </div>
+              <h4>Drag & Drop your Combined Excel sheet here</h4>
+              <p>Supports exact plant columns: Date, Shift, Machine, part number, Planned time, Maintance, die related, setup, No manpower, Heating time, minor stop, total downtime, operating time, total parts, good parts, rejects, ideal cycle time</p>
+              <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display: none;">
+              <button class="btn btn-primary" onclick="document.getElementById('excelFileInput').click()">
+                <i class="fa-solid fa-folder-open"></i> Browse Combined Excel File
+              </button>
+            </div>
+
+            <div class="template-download-box mt-3">
+              <div class="template-info">
+                <i class="fa-solid fa-file-csv icon-csv"></i>
+                <div>
+                  <strong>Combined Fleet Standard Template (2 x 12h | 60m Breaks)</strong>
+                  <p>Pre-configured for 12h shifts with 60m planned breaks (30m Lunch + 30m Tea) => Net 660m Planned Time.</p>
+                </div>
+              </div>
+              <div class="template-buttons">
+                <button class="btn btn-outline btn-sm" id="downloadXlsxTemplateBtn">
+                  <i class="fa-solid fa-download"></i> Fleet Template (.xlsx)
+                </button>
+                <button class="btn btn-outline btn-sm" id="downloadCsvTemplateBtn">
+                  <i class="fa-solid fa-download"></i> CSV Template (.csv)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Export & Backup Options Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-file-export"></i> Export Reports & Logs</h3>
+            </div>
+            
+            <div class="export-options-list">
+              <div class="export-item">
+                <div class="export-icon">
+                  <i class="fa-solid fa-file-excel text-success"></i>
+                </div>
+                <div class="export-details">
+                  <h4>Full Shift Logs (Plant Format)</h4>
+                  <p>Export all machine shift logs including all 17 plant data columns.</p>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="exportFullExcelBtn">
+                  <i class="fa-solid fa-download"></i> Export Excel
+                </button>
+              </div>
+
+              <div class="export-item">
+                <div class="export-icon">
+                  <i class="fa-solid fa-chart-pie text-info"></i>
+                </div>
+                <div class="export-details">
+                  <h4>5 Machine Summary Report</h4>
+                  <p>Export calculated OEE, Availability, Performance, and Downtime totals.</p>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="exportSummaryExcelBtn">
+                  <i class="fa-solid fa-download"></i> Summary Report
+                </button>
+              </div>
+
+              <div class="export-item">
+                <div class="export-icon">
+                  <i class="fa-solid fa-database text-warning"></i>
+                </div>
+                <div class="export-details">
+                  <h4>System Data Reset / Restore</h4>
+                  <p>Reset data to original sample dataset or clear log history.</p>
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-outline btn-sm" id="reloadSampleDataBtn">
+                    <i class="fa-solid fa-arrows-rotate"></i> Reload Defaults
+                  </button>
+                  <button class="btn btn-danger btn-sm" id="clearAllLogsBtn">
+                    <i class="fa-solid fa-trash-can"></i> Clear All Logs
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Excel Data Preview Table Container -->
+        <div class="card mt-4" id="excelPreviewCard" style="display: none;">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-eye"></i> Excel Import Preview (<span id="excelPreviewTargetLabel">Combined</span> - <span id="excelRecordCount">0</span> records)</h3>
+            <div class="card-actions">
+              <button class="btn btn-success btn-sm" id="commitExcelImportBtn">
+                <i class="fa-solid fa-check-double"></i> Confirm & Import Records
+              </button>
+              <button class="btn btn-secondary btn-sm" id="cancelExcelImportBtn">
+                <i class="fa-solid fa-xmark"></i> Cancel
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="excelPreviewTable">
+              <thead>
+                <!-- JS populated -->
+              </thead>
+              <tbody>
+                <!-- JS populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: SHIFT LOGS TABLE -->
+      <section class="tab-content" id="tab-logs">
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-list-check"></i> Shift Records Master Log</h3>
+            <div class="card-search">
+              <input type="text" id="logSearchInput" placeholder="Search Machine, Part Number, Shift...">
+              <button class="btn btn-outline btn-sm" id="exportLogsCsvBtn">
+                <i class="fa-solid fa-file-csv"></i> Download CSV
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table" id="logsTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Shift</th>
+                  <th>Machine</th>
+                  <th>Part Number</th>
+                  <th>Net Planned</th>
+                  <th>Maintance</th>
+                  <th>Die Related</th>
+                  <th>Setup</th>
+                  <th>No Manpower</th>
+                  <th>Heating Time</th>
+                  <th>Minor Stop</th>
+                  <th>Total Downtime</th>
+                  <th>Operating Time</th>
+                  <th>Total Parts</th>
+                  <th>Good Parts</th>
+                  <th>Rejects</th>
+                  <th>Ideal Cycle</th>
+                  <th>Avail %</th>
+                  <th>Perf %</th>
+                  <th>Qual %</th>
+                  <th>OEE %</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="logsTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="table-footer">
+            <span id="tableRecordCounter">Showing 0 of 0 records</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Forge OEE Monitor System &copy; 2026 | 2 x 12h Shift System (60m Planned Breaks: 30m Lunch + 30m Tea => 660m Net Planned)</p>
+    </footer>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast" id="toastNotification">
+    <i class="toast-icon fa-solid fa-circle-check"></i>
+    <span class="toast-message" id="toastMessage">Operation completed successfully.</span>
+  </div>
+
+  <!-- JS Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
