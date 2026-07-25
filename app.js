@@ -39,6 +39,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     loadShiftLogs();
+    checkUrlForSharedData();
     setupEventListeners();
     setupLiveCalculator();
     setupExcelDropZone();
@@ -294,6 +295,52 @@
      ========================================================================== */
   function generateDefaultLogs() {
     return []; // Clean empty by default
+  }
+
+  function checkUrlForSharedData() {
+    try {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#data=')) {
+        const encoded = hash.replace('#data=', '');
+        const jsonStr = decodeURIComponent(atob(encoded));
+        const importedLogs = JSON.parse(jsonStr);
+        if (Array.isArray(importedLogs) && importedLogs.length > 0) {
+          shiftLogs = importedLogs;
+          saveShiftLogs();
+          showToast(`Loaded ${importedLogs.length} shift logs from shared URL!`, 'success');
+          history.replaceState(null, null, window.location.pathname + window.location.search);
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing URL data:', e);
+    }
+  }
+
+  function generateShareableDataUrl() {
+    if (shiftLogs.length === 0) {
+      showToast('No shift logs to share yet. Upload Excel files first!', 'warning');
+      return;
+    }
+
+    try {
+      const jsonStr = JSON.stringify(shiftLogs);
+      const encoded = btoa(encodeURIComponent(jsonStr));
+      const shareUrl = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
+      
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast('Shareable Live Data URL copied to clipboard!', 'success');
+          alert(`Shareable Live Data Link Generated!\n\nOpen this link on any computer or mobile phone to instantly load all ${shiftLogs.length} uploaded shift records:\n\n${shareUrl}`);
+        }).catch(() => {
+          prompt('Copy your Live Data Link below to share with other computers:', shareUrl);
+        });
+      } else {
+        prompt('Copy your Live Data Link below to share with other computers:', shareUrl);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Error generating share URL. Export Excel file instead.', 'danger');
+    }
   }
 
   function loadShiftLogs() {
@@ -2174,6 +2221,11 @@
 
     document.getElementById('openManualEntryBtn').addEventListener('click', () => switchTab('entry'));
     document.getElementById('openExcelModalBtn').addEventListener('click', () => switchTab('excel'));
+    
+    const shareBtn = document.getElementById('shareDataLinkBtn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', generateShareableDataUrl);
+    }
 
     const filterIds = ['globalHammerFilter', 'globalShiftFilter', 'globalRangeFilter'];
     filterIds.forEach(id => {
