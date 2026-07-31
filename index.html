@@ -17,6 +17,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- Firebase Realtime Database for Instant Multi-User Live Sync -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <!-- Application CSS -->
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -1010,6 +1014,50 @@
                     <i class="fa-solid fa-trash-can"></i> Clear All Logs
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        <!-- Online Cloud Database Multi-User Real-Time Sync Section -->
+        <div class="card mt-4">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3><i class="fa-solid fa-cloud-bolt text-success"></i> Realtime Multi-User Cloud Database Sync</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Instant bi-directional live sync: Any data updated by User A or User B on any device appears live on both screens</p>
+            </div>
+            <span class="badge badge-success" id="cloudSyncStatusBadge"><i class="fa-solid fa-bolt"></i> Live Sync: Active</span>
+          </div>
+
+          <div class="grid-2-col mt-3">
+            <div>
+              <h4 style="font-size: 13px; margin-bottom: 8px; color: var(--primary);"><i class="fa-solid fa-database"></i> Live Cloud Database Connection</h4>
+              <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Data updates made on Person 1's computer or phone automatically trigger instant screen updates on Person 2's computer without refreshing.</p>
+              
+              <div class="form-group">
+                <label for="cloudDbEndpointInput">Central Cloud Database URL / Endpoint:</label>
+                <input type="text" id="cloudDbEndpointInput" value="https://forge-oee-monitor-default-rtdb.firebaseio.com" placeholder="e.g. https://your-db.firebaseio.com">
+              </div>
+
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;" class="mt-2">
+                <button class="btn btn-primary btn-sm" id="pushToCloudDbBtn">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Broadcast Data to All Users
+                </button>
+                <button class="btn btn-secondary btn-sm" id="pullFromCloudDbBtn">
+                  <i class="fa-solid fa-cloud-arrow-down"></i> Force Pull Remote Data
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h4 style="font-size: 13px; margin-bottom: 8px; color: var(--primary);"><i class="fa-solid fa-users"></i> Multi-User Instant Sync Instructions</h4>
+              <ul style="font-size: 12px; color: var(--text-muted); padding-left: 18px; line-height: 1.6;">
+                <li><strong>Person A:</strong> Upload Excel sheets or add manual shift entries on Computer A.</li>
+                <li><strong>Person B:</strong> Open the app on Computer B or mobile phone.</li>
+                <li><strong>Result:</strong> Both users see identical updated OEE gauges, KPIs, Pareto charts, and tables in real time!</li>
+              </ul>
+              <div class="mt-3">
+                <button class="btn btn-success btn-sm w-100" onclick="generateShareableDataUrl()">
+                  <i class="fa-solid fa-share-nodes"></i> Copy Multi-User Shared Link with Data
+                </button>
               </div>
             </div>
           </div>

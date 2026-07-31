@@ -411,7 +411,61 @@
       });
   }
 
+  let firebaseDbRef = null;
+  let isRemoteUpdating = false;
+
+  function initRealtimeCloudDatabase() {
+    const endpoint = getCloudEndpoint();
+    const pill = document.getElementById('cloudDbStatusPill');
+
+    if (typeof firebase !== 'undefined' && endpoint.includes('firebaseio.com')) {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp({ databaseURL: endpoint });
+        }
+        firebaseDbRef = firebase.database().ref('shiftLogs');
+
+        firebaseDbRef.on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            let fetchedLogs = Array.isArray(val) ? val : Object.values(val);
+            if (fetchedLogs.length > 0) {
+              isRemoteUpdating = true;
+              shiftLogs = fetchedLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+              localStorage.setItem('oee_shift_logs_v10', JSON.stringify(shiftLogs));
+              renderAllViews();
+              isRemoteUpdating = false;
+              if (pill) {
+                pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-bolt"></i> Realtime Sync (${shiftLogs.length} logs)`;
+                pill.style.borderColor = 'var(--primary)';
+              }
+            }
+          }
+        });
+        console.log('Firebase Realtime Multi-User Live Sync initialized.');
+      } catch (err) {
+        console.warn('Firebase init warning:', err);
+      }
+    }
+  }
+
+  function broadcastDataToCloud() {
+    if (isRemoteUpdating) return;
+
+    if (firebaseDbRef) {
+      firebaseDbRef.set(shiftLogs)
+        .then(() => {
+          showToast('⚡ Live data broadcasted to all connected users!', 'success');
+        })
+        .catch(err => {
+          console.warn('Firebase broadcast failed:', err);
+        });
+    }
+  }
+
   function setupCloudDbSync() {
+    initRealtimeCloudDatabase();
+
     const syncHeaderBtn = document.getElementById('cloudDbSyncBtn');
     const pullBtn = document.getElementById('pullFromCloudDbBtn');
     const pushBtn = document.getElementById('pushToCloudDbBtn');
@@ -419,7 +473,7 @@
 
     if (syncHeaderBtn) syncHeaderBtn.addEventListener('click', () => pullFromCloudDb(false));
     if (pullBtn) pullBtn.addEventListener('click', () => pullFromCloudDb(false));
-    if (pushBtn) pushBtn.addEventListener('click', () => generateShareableDataUrl());
+    if (pushBtn) pushBtn.addEventListener('click', () => broadcastDataToCloud());
 
     if (autoSelect) {
       autoSelect.addEventListener('change', () => {
@@ -434,13 +488,13 @@
         }
       });
 
-      // Start auto sync every 10 seconds default
       cloudSyncTimer = setInterval(() => pullFromCloudDb(true), 10000);
     }
   }
 
   function saveShiftLogs() {
     localStorage.setItem('oee_shift_logs_v10', JSON.stringify(shiftLogs));
+    broadcastDataToCloud();
   }
 
   function updateMonthFilterOptions() {
