@@ -329,20 +329,17 @@
       const encoded = btoa(encodeURIComponent(jsonStr));
       const shareUrl = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
       
-      const qrImg = document.getElementById('mobileQrCodeImg');
       const input = document.getElementById('mobileShareUrlInput');
       const modal = document.getElementById('mobileQrModalBackdrop');
 
-      if (qrImg) {
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(shareUrl)}`;
-      }
       if (input) input.value = shareUrl;
       if (modal) modal.style.display = 'flex';
 
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(shareUrl).catch(() => {});
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast(`Shareable Link copied! Includes all ${shiftLogs.length} logs.`, 'success');
+        }).catch(() => {});
       }
-      showToast(`Generated mobile QR & link with ${shiftLogs.length} shift logs!`, 'success');
     } catch (err) {
       console.error(err);
       showToast('Error generating share URL.', 'danger');

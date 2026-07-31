@@ -1161,24 +1161,24 @@
   <!-- JS Logic -->
   <script src="app.js"></script>
 
-  <!-- Mobile Scan & Share Data Modal -->
+  <!-- Shareable Live Data Link Modal -->
   <div class="modal-backdrop" id="mobileQrModalBackdrop" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999;">
-    <div class="card" style="max-width: 420px; width: 90%; text-align: center; background: var(--bg-card); padding: 20px; border-radius: 12px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <h3 style="font-size: 16px; color: var(--primary);"><i class="fa-solid fa-mobile-screen-button text-success"></i> Open App on Mobile Phone</h3>
+    <div class="card" style="max-width: 520px; width: 92%; text-align: left; background: var(--bg-card); padding: 22px; border-radius: 12px; position: relative;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+        <h3 style="font-size: 16px; color: var(--primary); margin: 0;"><i class="fa-solid fa-share-nodes text-success"></i> Shareable Live Data Link</h3>
         <button class="btn btn-icon btn-sm" id="closeMobileQrModalBtn"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div>
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">
-          Scan this QR code with your mobile camera or WhatsApp to open the app with <strong>all computer data loaded</strong>:
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+          This link includes <strong>100% of your uploaded shift data</strong>. Send it via WhatsApp or Email to open on mobile phones or other computers:
         </p>
-        <div style="background: white; padding: 12px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-          <img id="mobileQrCodeImg" src="" alt="Mobile QR Code" style="width: 210px; height: 210px; display: block; margin: 0 auto;">
-        </div>
-        <div class="mt-3">
-          <input type="text" id="mobileShareUrlInput" readonly style="width: 100%; font-size: 11px; padding: 8px; border-radius: 6px; border: 1px solid var(--border); text-align: center; margin-bottom: 10px; background: var(--bg-body); color: var(--text-main);">
-          <button class="btn btn-success btn-sm w-100" id="copyMobileUrlBtn">
-            <i class="fa-solid fa-copy"></i> Copy Link for Mobile WhatsApp
+        <textarea id="mobileShareUrlInput" readonly rows="4" style="width: 100%; font-size: 11px; font-family: monospace; padding: 10px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 12px; background: var(--bg-body); color: var(--text-main); resize: none;"></textarea>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-success w-100" id="copyMobileUrlBtn">
+            <i class="fa-solid fa-copy"></i> Copy Shareable Link
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('mobileQrModalBackdrop').style.display='none'">
+            Close
           </button>
         </div>
       </div>
