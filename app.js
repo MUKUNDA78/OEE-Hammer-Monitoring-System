@@ -345,18 +345,58 @@
     }
   }
 
-  function loadShiftLogs() {
-    const saved = localStorage.getItem('oee_shift_logs_v10');
-    if (saved) {
-      try {
-        shiftLogs = JSON.parse(saved);
-      } catch (e) {
-        shiftLogs = [];
+  function mergeLogArrays(logsA, logsB) {
+    const map = new Map();
+    const getRecordKey = (l) => {
+      if (!l) return null;
+      if (l.id) return String(l.id);
+      return `${l.date}_${l.machine}_${l.shift}_${l.partNumber}_${l.plannedTimeMins}_${l.goodParts}`;
+    };
+
+    (logsA || []).forEach(l => {
+      const k = getRecordKey(l);
+      if (k) map.set(k, l);
+    });
+
+    (logsB || []).forEach(l => {
+      const k = getRecordKey(l);
+      if (k) map.set(k, l);
+    });
+
+    return Array.from(map.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+
+  function recoverAllPreviousLogs() {
+    let recovered = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('oee_shift_logs') || key.includes('shift_logs') || key.includes('backup') || key.includes('oee'))) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                recovered = mergeLogArrays(recovered, parsed);
+              }
+            } catch (err) {}
+          }
+        }
       }
+    } catch (e) {
+      console.error('Recovery scan error:', e);
+    }
+    return recovered;
+  }
+
+  function loadShiftLogs() {
+    const recovered = recoverAllPreviousLogs();
+    if (recovered.length > 0) {
+      shiftLogs = recovered;
     } else {
       shiftLogs = [];
-      saveShiftLogs();
     }
+    saveShiftLogs();
   }
 
   let cloudSyncTimer = null;
@@ -389,10 +429,10 @@
         }
 
         if (fetchedLogs.length > 0) {
-          shiftLogs = fetchedLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+          shiftLogs = mergeLogArrays(shiftLogs, fetchedLogs);
           saveShiftLogs();
           renderAllViews();
-          if (!silent) showToast(`Online DB Synced! ${shiftLogs.length} logs loaded.`, 'success');
+          if (!silent) showToast(`Online DB Synced! ${shiftLogs.length} logs active.`, 'success');
         } else if (!silent) {
           showToast('Online DB connected. Ready for multi-user shift uploads.', 'info');
         }
@@ -431,8 +471,9 @@
             let fetchedLogs = Array.isArray(val) ? val : Object.values(val);
             if (fetchedLogs.length > 0) {
               isRemoteUpdating = true;
-              shiftLogs = fetchedLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+              shiftLogs = mergeLogArrays(shiftLogs, fetchedLogs);
               localStorage.setItem('oee_shift_logs_v10', JSON.stringify(shiftLogs));
+              localStorage.setItem('oee_shift_logs_backup', JSON.stringify(shiftLogs));
               renderAllViews();
               isRemoteUpdating = false;
               if (pill) {
@@ -440,6 +481,9 @@
                 pill.style.borderColor = 'var(--primary)';
               }
             }
+          } else if (shiftLogs.length > 0) {
+            // Remote DB empty, broadcast local logs to populate Cloud DB!
+            broadcastDataToCloud();
           }
         });
         console.log('Firebase Realtime Multi-User Live Sync initialized.');
@@ -452,7 +496,7 @@
   function broadcastDataToCloud() {
     if (isRemoteUpdating) return;
 
-    if (firebaseDbRef) {
+    if (firebaseDbRef && shiftLogs.length > 0) {
       firebaseDbRef.set(shiftLogs)
         .then(() => {
           showToast('⚡ Live data broadcasted to all connected users!', 'success');
@@ -2334,6 +2378,19 @@
     });
   }
 
+  function recoverAndRestoreData() {
+    const recovered = recoverAllPreviousLogs();
+    if (recovered.length > 0) {
+      shiftLogs = mergeLogArrays(shiftLogs, recovered);
+      saveShiftLogs();
+      renderAllViews();
+      showToast(`Recovered ${shiftLogs.length} shift logs!`, 'success');
+      alert(`Data Recovery Completed!\n\nSuccessfully scanned browser storage and recovered ${shiftLogs.length} total shift records. All data has been saved and broadcasted.`);
+    } else {
+      showToast('No backup logs found in local browser storage.', 'info');
+    }
+  }
+
   /* ==========================================================================
      EVENT LISTENERS & TAB NAVIGATION
      ========================================================================== */
@@ -2361,6 +2418,11 @@
     const shareBtn = document.getElementById('shareDataLinkBtn');
     if (shareBtn) {
       shareBtn.addEventListener('click', generateShareableDataUrl);
+    }
+
+    const recoverBtn = document.getElementById('restoreBackupLogsBtn');
+    if (recoverBtn) {
+      recoverBtn.addEventListener('click', recoverAndRestoreData);
     }
 
     const filterIds = ['globalHammerFilter', 'globalShiftFilter', 'globalRangeFilter'];
