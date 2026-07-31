@@ -318,6 +318,31 @@
     }
   }
 
+  function copyTextToClipboard(text, elementToSelect = null) {
+    if (elementToSelect) {
+      try {
+        elementToSelect.focus();
+        elementToSelect.select();
+        if (elementToSelect.setSelectionRange) {
+          elementToSelect.setSelectionRange(0, 999999);
+        }
+      } catch (e) {}
+    }
+
+    let success = false;
+    try {
+      success = document.execCommand('copy');
+    } catch (e) {
+      success = false;
+    }
+
+    if (!success && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => { success = true; }).catch(() => {});
+    }
+
+    return success;
+  }
+
   function generateShareableDataUrl() {
     if (shiftLogs.length === 0) {
       showToast('No shift logs to share yet. Upload Excel files first!', 'warning');
@@ -335,11 +360,11 @@
       if (input) input.value = shareUrl;
       if (modal) modal.style.display = 'flex';
 
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(shareUrl).then(() => {
-          showToast(`Shareable Link copied! Includes all ${shiftLogs.length} logs.`, 'success');
-        }).catch(() => {});
-      }
+      setTimeout(() => {
+        if (input) copyTextToClipboard(shareUrl, input);
+        showToast(`Shareable Link selected & copied! (${shiftLogs.length} logs)`, 'success');
+      }, 100);
+
     } catch (err) {
       console.error(err);
       showToast('Error generating share URL.', 'danger');
@@ -2458,15 +2483,18 @@
       copyMobileBtn.addEventListener('click', () => {
         const input = document.getElementById('mobileShareUrlInput');
         if (input && input.value) {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(input.value).then(() => {
-              showToast('Mobile link copied! Send to WhatsApp or Mobile Browser.', 'success');
-            }).catch(() => {
-              prompt('Copy Mobile Link:', input.value);
-            });
-          } else {
-            prompt('Copy Mobile Link:', input.value);
-          }
+          copyTextToClipboard(input.value, input);
+          showToast('Shareable Live Link copied to clipboard!', 'success');
+        }
+      });
+    }
+
+    const openMobileBtn = document.getElementById('openMobileUrlBtn');
+    if (openMobileBtn) {
+      openMobileBtn.addEventListener('click', () => {
+        const input = document.getElementById('mobileShareUrlInput');
+        if (input && input.value) {
+          window.open(input.value, '_blank');
         }
       });
     }
