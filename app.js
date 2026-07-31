@@ -329,19 +329,23 @@
       const encoded = btoa(encodeURIComponent(jsonStr));
       const shareUrl = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
       
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(shareUrl).then(() => {
-          showToast('Shareable Live Data URL copied to clipboard!', 'success');
-          alert(`Shareable Live Data Link Generated!\n\nOpen this link on any computer or mobile phone to instantly load all ${shiftLogs.length} uploaded shift records:\n\n${shareUrl}`);
-        }).catch(() => {
-          prompt('Copy your Live Data Link below to share with other computers:', shareUrl);
-        });
-      } else {
-        prompt('Copy your Live Data Link below to share with other computers:', shareUrl);
+      const qrImg = document.getElementById('mobileQrCodeImg');
+      const input = document.getElementById('mobileShareUrlInput');
+      const modal = document.getElementById('mobileQrModalBackdrop');
+
+      if (qrImg) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(shareUrl)}`;
       }
+      if (input) input.value = shareUrl;
+      if (modal) modal.style.display = 'flex';
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).catch(() => {});
+      }
+      showToast(`Generated mobile QR & link with ${shiftLogs.length} shift logs!`, 'success');
     } catch (err) {
       console.error(err);
-      showToast('Error generating share URL. Export Excel file instead.', 'danger');
+      showToast('Error generating share URL.', 'danger');
     }
   }
 
@@ -2443,6 +2447,32 @@
     document.getElementById('logSearchInput').addEventListener('input', () => {
       renderLogsTable(getFilteredLogs());
     });
+
+    const closeQrBtn = document.getElementById('closeMobileQrModalBtn');
+    if (closeQrBtn) {
+      closeQrBtn.addEventListener('click', () => {
+        const modal = document.getElementById('mobileQrModalBackdrop');
+        if (modal) modal.style.display = 'none';
+      });
+    }
+
+    const copyMobileBtn = document.getElementById('copyMobileUrlBtn');
+    if (copyMobileBtn) {
+      copyMobileBtn.addEventListener('click', () => {
+        const input = document.getElementById('mobileShareUrlInput');
+        if (input && input.value) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(() => {
+              showToast('Mobile link copied! Send to WhatsApp or Mobile Browser.', 'success');
+            }).catch(() => {
+              prompt('Copy Mobile Link:', input.value);
+            });
+          } else {
+            prompt('Copy Mobile Link:', input.value);
+          }
+        }
+      });
+    }
 
     document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
     document.getElementById('exportComparisonCsv').addEventListener('click', exportSummaryExcel);
