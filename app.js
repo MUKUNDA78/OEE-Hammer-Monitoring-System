@@ -2000,6 +2000,11 @@
     const rejectsCandidates = ['rejects', 'reject', 'scrap', 'defects', 'rejected parts', 'rejections', 'rejection', 'scrap qty', 'bad parts', 'rej'];
     const idealCycleCandidates = ['ideal cycle time', 'ideal_cycle_time', 'ideal cycle', 'cycle time', 'std cycle time', 'ideal cycle (sec)', 'cycle time sec', 'ct'];
 
+    const availabilityCandidates = ['availability', 'availability (%)', 'avail', 'avail %', 'availability_pct', 'availability rate'];
+    const performanceCandidates = ['performance', 'performance (%)', 'perf', 'perf %', 'performance_pct', 'performance rate'];
+    const qualityCandidates = ['quality', 'quality (%)', 'qual', 'qual %', 'quality_pct', 'quality rate'];
+    const oeeCandidates = ['oee', 'overall oee', 'oee (%)', 'oee %', 'overall_oee'];
+
     rows.forEach(r => {
       const rawDate = findVal(r, dateCandidates);
       const date = formatExcelDate(rawDate);
@@ -2164,7 +2169,11 @@
         "total parts": 800,
         "good parts": 785,
         "rejects": 15,
-        "ideal cycle time": hammerObj.defaultCycle
+        "ideal cycle time": hammerObj.defaultCycle,
+        "Availability": 89.4,
+        "Performance": 94.9,
+        "Quality": 98.1,
+        "OEE": 83.2
       },
       {
         "Date": "2026-07-25",
@@ -2183,7 +2192,11 @@
         "total parts": 760,
         "good parts": 745,
         "rejects": 15,
-        "ideal cycle time": hammerObj.defaultCycle
+        "ideal cycle time": hammerObj.defaultCycle,
+        "Availability": 87.1,
+        "Performance": 92.5,
+        "Quality": 98.0,
+        "OEE": 79.0
       }
     ];
 
@@ -2213,7 +2226,11 @@
         "total parts": 900,
         "good parts": 885,
         "rejects": 15,
-        "ideal cycle time": 35
+        "ideal cycle time": 35,
+        "Availability": 87.1,
+        "Performance": 91.3,
+        "Quality": 98.3,
+        "OEE": 78.2
       },
       {
         "Date": "2026-07-25",
@@ -2232,7 +2249,11 @@
         "total parts": 520,
         "good parts": 505,
         "rejects": 15,
-        "ideal cycle time": 55
+        "ideal cycle time": 55,
+        "Availability": 72.0,
+        "Performance": 100.0,
+        "Quality": 97.1,
+        "OEE": 69.9
       }
     ];
 
@@ -2243,9 +2264,9 @@
   }
 
   function downloadCsvTemplate() {
-    const headers = "Date,Shift,Machine,part number,Planned time,Maintance,die related,setup,No manpower,Heating time,minor stop,total downtime,operating time,total parts,good parts,rejects,ideal cycle time\n";
-    const row1 = "2026-07-25,Shift A,1 Ton Hammer,A1#21,660,20,25,15,0,15,10,85,575,900,885,15,35\n";
-    const row2 = "2026-07-25,Shift B,3.5 Ton Hammer,M5#102,660,20,25,20,0,50,15,130,530,480,465,15,70\n";
+    const headers = "Date,Shift,Machine,part number,Planned time,Maintance,die related,setup,No manpower,Heating time,minor stop,total downtime,operating time,total parts,good parts,rejects,ideal cycle time,Availability,Performance,Quality,OEE\n";
+    const row1 = "2026-07-25,Shift A,1 Ton Hammer,A1#21,660,20,25,15,0,15,10,85,575,900,885,15,35,87.1,91.3,98.3,78.2\n";
+    const row2 = "2026-07-25,Shift B,3.5 Ton Hammer,M5#102,660,20,25,20,0,50,15,130,530,480,465,15,70,80.3,100.0,96.9,77.8\n";
     
     downloadFile(headers + row1 + row2, "Forge_Plant_OEE_12h_Net660_Template.csv", "text/csv");
   }
@@ -2275,10 +2296,10 @@
       "good parts": l.goodParts,
       "rejects": l.rejects,
       "ideal cycle time": l.idealCycleSec,
-      "Availability (%)": l.availability,
-      "Performance (%)": l.performance,
-      "Quality (%)": l.quality,
-      "Overall OEE (%)": l.oee
+      "Availability": l.availability,
+      "Performance": l.performance,
+      "Quality": l.quality,
+      "OEE": l.oee
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportRows);
