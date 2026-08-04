@@ -255,7 +255,7 @@
     // 2. Performance Rate (P = Ideal Production Time / Operating Time)
     const idealProdTimeMins = (totalParts * idealCycleSec) / 60;
     let performance = operatingTime > 0 ? (idealProdTimeMins / operatingTime) * 100 : 0;
-    if (performance > 120) performance = 120; // Cap at 120% for fast forge runs
+    if (performance > 100) performance = 100.0; // Cap strictly at 100.0% max per industrial plant standards
 
     // 3. Quality Rate (Q = Good Parts / Total Parts)
     const quality = totalParts > 0 ? Math.min(100, Math.max(0, (goodParts / totalParts) * 100)) : 100;
@@ -418,7 +418,7 @@
   function loadShiftLogs() {
     const recovered = recoverAllPreviousLogs();
     if (recovered.length > 0) {
-      shiftLogs = recovered;
+      shiftLogs = recovered.map(l => calculateOeeRecord(l));
     } else {
       shiftLogs = [];
     }
@@ -1023,7 +1023,7 @@
         });
 
         avail = pMins > 0 ? (oMins / pMins) * 100 : 0;
-        perf = oMins > 0 ? Math.min(120, (iMins / oMins) * 100) : 0;
+        perf = oMins > 0 ? Math.min(100, (iMins / oMins) * 100) : 0;
         qual = totalParts > 0 ? (goodParts / totalParts) * 100 : 100;
         oee = (avail / 100) * (perf / 100) * (qual / 100) * 100;
       }
@@ -1211,7 +1211,7 @@
           goodPcs += l.goodParts;
         });
         availData.push(parseFloat(((oMins / pMins) * 100).toFixed(1)));
-        perfData.push(parseFloat((Math.min(120, (iMins / oMins) * 100)).toFixed(1)));
+        perfData.push(parseFloat((Math.min(100, (iMins / oMins) * 100)).toFixed(1)));
         qualData.push(parseFloat(((goodPcs / totalPcs) * 100).toFixed(1)));
       }
     });
@@ -1300,7 +1300,7 @@
       });
 
       const avail = pMins > 0 ? (oMins / pMins) * 100 : 0;
-      const perf = oMins > 0 ? Math.min(120, (iMins / oMins) * 100) : 0;
+      const perf = oMins > 0 ? Math.min(100, (iMins / oMins) * 100) : 0;
       const qual = totalPcs > 0 ? (goodPcs / totalPcs) * 100 : 100;
       const oee = (avail / 100) * (perf / 100) * (qual / 100) * 100;
 
