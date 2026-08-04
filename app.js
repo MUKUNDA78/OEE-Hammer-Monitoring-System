@@ -415,14 +415,34 @@
     return recovered;
   }
 
+  function wipeAllSystemDataCompletely() {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      shiftLogs = [];
+      localStorage.setItem('oee_shift_logs_v10', JSON.stringify([]));
+
+      if (firebaseDbRef) {
+        firebaseDbRef.set([]);
+      }
+    } catch (e) {
+      console.error('Wipe error:', e);
+    }
+    renderAllViews();
+    showToast('All system data deleted completely! Ready for fresh Excel uploads.', 'info');
+  }
+
   function loadShiftLogs() {
-    const recovered = recoverAllPreviousLogs();
-    if (recovered.length > 0) {
-      shiftLogs = recovered.map(l => calculateOeeRecord(l));
+    const saved = localStorage.getItem('oee_shift_logs_v10');
+    if (saved) {
+      try {
+        shiftLogs = JSON.parse(saved).map(l => calculateOeeRecord(l));
+      } catch (e) {
+        shiftLogs = [];
+      }
     } else {
       shiftLogs = [];
     }
-    saveShiftLogs();
   }
 
   let cloudSyncTimer = null;
@@ -2497,6 +2517,16 @@
           window.open(input.value, '_blank');
         }
       });
+    }
+
+    const clearHeaderBtn = document.getElementById('clearDemoDataHeaderBtn');
+    if (clearHeaderBtn) {
+      clearHeaderBtn.addEventListener('click', wipeAllSystemDataCompletely);
+    }
+
+    const clearAllLogsBtn = document.getElementById('clearAllLogsBtn');
+    if (clearAllLogsBtn) {
+      clearAllLogsBtn.addEventListener('click', wipeAllSystemDataCompletely);
     }
 
     document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
