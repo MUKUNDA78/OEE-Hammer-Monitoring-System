@@ -685,15 +685,15 @@
     logs.forEach(l => {
       totalPlannedMins += l.plannedTimeMins;
       totalOperatingMins += l.operatingTimeMins;
-      totalIdealMins += (l.totalParts * l.idealCycleSec) / 60;
+      totalIdealMins += Math.min(l.operatingTimeMins, (l.totalParts * l.idealCycleSec) / 60);
       totalProduced += l.totalParts;
       totalGood += l.goodParts;
       totalRejects += l.rejects;
     });
 
-    const avgAvail = totalPlannedMins > 0 ? (totalOperatingMins / totalPlannedMins) * 100 : 0;
-    const avgPerf = totalOperatingMins > 0 ? Math.min(120, (totalIdealMins / totalOperatingMins) * 100) : 0;
-    const avgQual = totalProduced > 0 ? (totalGood / totalProduced) * 100 : 100;
+    const avgAvail = totalPlannedMins > 0 ? Math.min(100, (totalOperatingMins / totalPlannedMins) * 100) : 0;
+    const avgPerf = totalOperatingMins > 0 ? Math.min(100, (totalIdealMins / totalOperatingMins) * 100) : 0;
+    const avgQual = totalProduced > 0 ? Math.min(100, (totalGood / totalProduced) * 100) : 100;
     const overallOee = (avgAvail / 100) * (avgPerf / 100) * (avgQual / 100) * 100;
 
     const scrapPct = totalProduced > 0 ? ((totalRejects / totalProduced) * 100).toFixed(1) : '0.0';
@@ -1458,15 +1458,15 @@
         pMins += l.plannedTimeMins;
         oMins += l.operatingTimeMins;
         downtimeMins += l.totalDowntimeMins;
-        iMins += (l.totalParts * l.idealCycleSec) / 60;
+        iMins += Math.min(l.operatingTimeMins, (l.totalParts * l.idealCycleSec) / 60);
         totalPcs += l.totalParts;
         goodPcs += l.goodParts;
         rejectsPcs += l.rejects;
       });
 
-      const avail = pMins > 0 ? (oMins / pMins) * 100 : 0;
-      const perf = oMins > 0 ? Math.min(120, (iMins / oMins) * 100) : 0;
-      const qual = totalPcs > 0 ? (goodPcs / totalPcs) * 100 : 100;
+      const avail = pMins > 0 ? Math.min(100, (oMins / pMins) * 100) : 0;
+      const perf = oMins > 0 ? Math.min(100, (iMins / oMins) * 100) : 0;
+      const qual = totalPcs > 0 ? Math.min(100, (goodPcs / totalPcs) * 100) : 100;
       const oee = (avail / 100) * (perf / 100) * (qual / 100) * 100;
 
       return {
