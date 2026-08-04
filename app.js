@@ -250,18 +250,18 @@
     }
 
     // 1. Availability Rate (A = Operating Time / Net Planned Time)
-    const availability = netPlannedTimeMins > 0 ? Math.min(100, Math.max(0, (operatingTime / netPlannedTimeMins) * 100)) : 0;
+    const availability = netPlannedTimeMins > 0 ? Math.min(100.0, Math.max(0, (operatingTime / netPlannedTimeMins) * 100)) : 0;
 
     // 2. Performance Rate (P = Ideal Production Time / Operating Time)
-    const idealProdTimeMins = (totalParts * idealCycleSec) / 60;
-    let performance = operatingTime > 0 ? (idealProdTimeMins / operatingTime) * 100 : 0;
-    if (performance > 100) performance = 100.0; // Cap strictly at 100.0% max per industrial plant standards
+    const rawIdealMins = (totalParts * idealCycleSec) / 60;
+    const idealProdTimeMins = Math.min(operatingTime, rawIdealMins);
+    const performance = operatingTime > 0 ? Math.min(100.0, Math.max(0, (idealProdTimeMins / operatingTime) * 100)) : 0;
 
     // 3. Quality Rate (Q = Good Parts / Total Parts)
-    const quality = totalParts > 0 ? Math.min(100, Math.max(0, (goodParts / totalParts) * 100)) : 100;
+    const quality = totalParts > 0 ? Math.min(100.0, Math.max(0, (goodParts / totalParts) * 100)) : 100.0;
 
     // 4. Overall OEE (OEE = A x P x Q)
-    const oee = (availability / 100) * (performance / 100) * (quality / 100) * 100;
+    const oee = Math.min(100.0, Math.max(0, (availability / 100) * (performance / 100) * (quality / 100) * 100));
 
     const cleanPartNo = data.partNumber ? String(data.partNumber).trim() : 'A1#21';
 
@@ -657,6 +657,7 @@
      UI RENDERERS & KPI CALCULATIONS
      ========================================================================== */
   function renderAllViews() {
+    shiftLogs = shiftLogs.map(l => calculateOeeRecord(l));
     updateMonthFilterOptions();
     const logs = getFilteredLogs();
 
