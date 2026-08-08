@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>GRS Engineering Pvt Ltd Unit 1 | OEE Hammer Monitoring System</title>
   
   <!-- Google Fonts -->
@@ -22,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <!-- Application CSS -->
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260808">
 </head>
 <body class="light-green-theme">
   <div class="app-wrapper">
@@ -30,12 +33,12 @@
     <!-- Top Navigation Header -->
     <header class="app-header">
       <div class="header-brand">
-        <div class="brand-logo">
+        <div class="brand-logo" style="background: linear-gradient(135deg, #16a34a, #059669); font-weight: bold;">
           <i class="fa-solid fa-industry"></i>
         </div>
         <div class="brand-text">
-          <h1>GRS ENGINEERING <span>PVT LTD</span> UNIT 1</h1>
-          <p>5-Hammer Fleet Efficiency & Production Analytics System</p>
+          <h1 style="font-size: 21px; font-weight: 800; letter-spacing: 0.5px;">GRS ENGINEERING <span style="color: #16a34a;">PVT LTD</span> UNIT 1</h1>
+          <p style="font-weight: 600; color: var(--text-muted);">5-Hammer Fleet Efficiency & Production Analytics System</p>
         </div>
       </div>
 
@@ -159,6 +162,23 @@
       <!-- TAB 1: OVERVIEW -->
       <section class="tab-content active" id="tab-overview">
         
+        <!-- Company Enterprise Banner -->
+        <div class="card mb-3" style="background: linear-gradient(135deg, rgba(22, 163, 74, 0.12), rgba(37, 99, 235, 0.08)); border-left: 5px solid #16a34a; padding: 16px 20px; border-radius: 10px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-building-user" style="color: #16a34a;"></i> GRS ENGINEERING PVT LTD <span style="color: #16a34a; font-weight: 900;">(UNIT 1)</span>
+              </h2>
+              <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 0 0; font-weight: 500;">
+                5-Hammer Fleet Efficiency Monitoring & Real-Time Production OEE Analytics Engine
+              </p>
+            </div>
+            <span class="badge badge-success" style="font-size: 13px; padding: 8px 16px; font-weight: 700; background: #16a34a; color: white;">
+              <i class="fa-solid fa-shield-halved"></i> Enterprise System Active
+            </span>
+          </div>
+        </div>
+
         <!-- Shift Schedule Banner -->
         <div class="shift-schedule-banner">
           <div class="schedule-pill"><i class="fa-solid fa-sun text-warning"></i> <strong>Shift A:</strong> 08:00 - 20:00 (12 Hours)</div>
