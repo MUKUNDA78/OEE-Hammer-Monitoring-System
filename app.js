@@ -299,19 +299,56 @@
     return []; // Clean empty by default
   }
 
+  function applyViewOnlyMode() {
+    window.IS_VIEW_ONLY = true;
+    const banner = document.getElementById('viewOnlyTopBanner');
+    if (banner) banner.style.display = 'block';
+
+    const hideElement = (id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    };
+
+    hideElement('openManualEntryBtn');
+    hideElement('openExcelModalBtn');
+    hideElement('clearDemoDataHeaderBtn');
+    hideElement('restoreBackupLogsBtn');
+    hideElement('pushToCloudDbBtn');
+
+    document.querySelectorAll('.nav-tab[data-tab="entry"], .nav-tab[data-tab="excel"]').forEach(tab => {
+      tab.style.display = 'none';
+    });
+
+    document.body.classList.add('view-only-active');
+  }
+
   function checkUrlForSharedData() {
     try {
+      const search = window.location.search;
       const hash = window.location.hash;
+
+      const isViewMode = search.includes('mode=view') || search.includes('view=1') || hash.startsWith('#viewData=');
+
+      let encodedPayload = null;
       if (hash && hash.startsWith('#data=')) {
-        const encoded = hash.replace('#data=', '');
-        const jsonStr = decodeURIComponent(atob(encoded));
+        encodedPayload = hash.replace('#data=', '');
+      } else if (hash && hash.startsWith('#viewData=')) {
+        encodedPayload = hash.replace('#viewData=', '');
+      }
+
+      if (encodedPayload) {
+        const jsonStr = decodeURIComponent(atob(encodedPayload));
         const importedLogs = JSON.parse(jsonStr);
         if (Array.isArray(importedLogs) && importedLogs.length > 0) {
           shiftLogs = importedLogs;
-          saveShiftLogs();
+          if (!isViewMode) saveShiftLogs();
           showToast(`Loaded ${importedLogs.length} shift logs from shared URL!`, 'success');
-          history.replaceState(null, null, window.location.pathname + window.location.search);
         }
+      }
+
+      if (isViewMode) {
+        applyViewOnlyMode();
+        showToast('Opened in Read-Only View Mode.', 'info');
       }
     } catch (e) {
       console.error('Error parsing URL data:', e);
@@ -352,17 +389,21 @@
     try {
       const jsonStr = JSON.stringify(shiftLogs);
       const encoded = btoa(encodeURIComponent(jsonStr));
-      const shareUrl = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
+
+      const viewOnlyUrl = `${window.location.origin}${window.location.pathname}?mode=view#data=${encoded}`;
+      const fullEditUrl = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
       
-      const input = document.getElementById('mobileShareUrlInput');
+      const viewOnlyInput = document.getElementById('viewOnlyShareUrlInput');
+      const editInput = document.getElementById('mobileShareUrlInput');
       const modal = document.getElementById('mobileQrModalBackdrop');
 
-      if (input) input.value = shareUrl;
+      if (viewOnlyInput) viewOnlyInput.value = viewOnlyUrl;
+      if (editInput) editInput.value = fullEditUrl;
       if (modal) modal.style.display = 'flex';
 
       setTimeout(() => {
-        if (input) copyTextToClipboard(shareUrl, input);
-        showToast(`Shareable Link selected & copied! (${shiftLogs.length} logs)`, 'success');
+        if (viewOnlyInput) copyTextToClipboard(viewOnlyUrl, viewOnlyInput);
+        showToast(`View-Only Share Link selected & copied! (${shiftLogs.length} logs)`, 'success');
       }, 100);
 
     } catch (err) {
@@ -2423,9 +2464,10 @@
         <td>${l.quality}%</td>
         <td><strong style="color: ${getOeeColor(l.oee)}; font-size: 14px;">${l.oee}%</strong></td>
         <td>
+          ${window.IS_VIEW_ONLY ? '<span class="badge badge-info"><i class="fa-solid fa-lock"></i> Read Only</span>' : `
           <button class="btn btn-danger btn-sm delete-log-btn" data-id="${l.id}" title="Delete Record">
             <i class="fa-solid fa-trash"></i>
-          </button>
+          </button>`}
         </td>
       `;
       tbody.appendChild(tr);
@@ -2480,8 +2522,11 @@
       });
     });
 
-    document.getElementById('openManualEntryBtn').addEventListener('click', () => switchTab('entry'));
-    document.getElementById('openExcelModalBtn').addEventListener('click', () => switchTab('excel'));
+    const manualBtn = document.getElementById('openManualEntryBtn');
+    if (manualBtn) manualBtn.addEventListener('click', () => switchTab('entry'));
+
+    const excelBtn = document.getElementById('openExcelModalBtn');
+    if (excelBtn) excelBtn.addEventListener('click', () => switchTab('excel'));
     
     const shareBtn = document.getElementById('shareDataLinkBtn');
     if (shareBtn) {
@@ -2520,13 +2565,24 @@
       });
     }
 
+    const copyViewOnlyBtn = document.getElementById('copyViewOnlyUrlBtn');
+    if (copyViewOnlyBtn) {
+      copyViewOnlyBtn.addEventListener('click', () => {
+        const input = document.getElementById('viewOnlyShareUrlInput');
+        if (input && input.value) {
+          copyTextToClipboard(input.value, input);
+          showToast('View-Only Share Link copied! Recipients cannot edit data.', 'success');
+        }
+      });
+    }
+
     const copyMobileBtn = document.getElementById('copyMobileUrlBtn');
     if (copyMobileBtn) {
       copyMobileBtn.addEventListener('click', () => {
         const input = document.getElementById('mobileShareUrlInput');
         if (input && input.value) {
           copyTextToClipboard(input.value, input);
-          showToast('Shareable Live Link copied to clipboard!', 'success');
+          showToast('Full Edit Share Link copied to clipboard!', 'success');
         }
       });
     }

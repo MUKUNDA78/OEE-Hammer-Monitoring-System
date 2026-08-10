@@ -31,6 +31,13 @@
 <body class="light-green-theme">
   <div class="app-wrapper">
     
+    <!-- View-Only Mode Banner -->
+    <div id="viewOnlyTopBanner" style="display: none; background: #0284c7; color: white; padding: 10px 20px; font-size: 13px; font-weight: 700; text-align: center; border-bottom: 2px solid #0369a1; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+      <i class="fa-solid fa-eye" style="margin-right: 8px;"></i>
+      READ-ONLY DASHBOARD VIEW MODE — GRS ENGINEERING PVT LTD UNIT 1
+      <span style="font-size: 11px; font-weight: 500; opacity: 0.95; margin-left: 12px; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 4px;">Data Editing & Manual Modifications Disabled</span>
+    </div>
+    
     <!-- Top Navigation Header -->
     <header class="app-header">
       <div class="header-brand">
@@ -1185,26 +1192,44 @@
 
   <!-- Shareable Live Data Link Modal -->
   <div class="modal-backdrop" id="mobileQrModalBackdrop" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999;">
-    <div class="card" style="max-width: 520px; width: 92%; text-align: left; background: var(--bg-card); padding: 22px; border-radius: 12px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
-        <h3 style="font-size: 16px; color: var(--primary); margin: 0;"><i class="fa-solid fa-share-nodes text-success"></i> Shareable Live Data Link</h3>
+    <div class="card" style="max-width: 540px; width: 92%; text-align: left; background: var(--bg-card); padding: 22px; border-radius: 12px; position: relative;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+        <h3 style="font-size: 16px; color: var(--primary); margin: 0;"><i class="fa-solid fa-share-nodes text-success"></i> Share Live Data (View-Only & Full Access)</h3>
         <button class="btn btn-icon btn-sm" id="closeMobileQrModalBtn"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-          This link includes <strong>100% of your uploaded shift data</strong>. Send it via WhatsApp or Email to open on mobile phones or other computers:
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+          Select link type to share live plant shift data via WhatsApp or Email:
         </p>
-        <textarea id="mobileShareUrlInput" readonly rows="4" onclick="this.focus();this.select();" style="width: 100%; font-size: 11px; font-family: monospace; padding: 10px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 12px; background: var(--bg-body); color: var(--text-main); resize: none;"></textarea>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <button class="btn btn-success" id="copyMobileUrlBtn" style="flex: 1;">
-            <i class="fa-solid fa-copy"></i> Copy Shareable Link
-          </button>
-          <button class="btn btn-primary" id="openMobileUrlBtn" style="flex: 1;">
-            <i class="fa-solid fa-arrow-up-right-from-square"></i> Test Open Link
-          </button>
-          <button class="btn btn-outline btn-sm" onclick="document.getElementById('mobileQrModalBackdrop').style.display='none'">
-            Close
-          </button>
+
+        <!-- View-Only Mode Option (Recommended) -->
+        <div style="background: rgba(2, 132, 199, 0.08); border: 1px solid #0284c7; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: #0284c7; font-size: 13px;"><i class="fa-solid fa-eye"></i> View-Only Mode Link (Recommended)</strong>
+            <span class="badge badge-info" style="font-size: 10px;">For Management / Visitors</span>
+          </div>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Recipients can explore all charts, gauges & monthly trends but <strong>cannot edit or delete data</strong>.</p>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="viewOnlyShareUrlInput" readonly onclick="this.focus();this.select();" style="flex: 1; font-size: 11px; font-family: monospace; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+            <button class="btn btn-primary btn-sm" id="copyViewOnlyUrlBtn"><i class="fa-solid fa-copy"></i> Copy View Link</button>
+          </div>
+        </div>
+
+        <!-- Full Edit Access Option -->
+        <div style="background: rgba(22, 163, 74, 0.08); border: 1px solid #16a34a; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: #16a34a; font-size: 13px;"><i class="fa-solid fa-pen-to-square"></i> Full Edit Access Link</strong>
+            <span class="badge badge-success" style="font-size: 10px;">For Plant Admins & Operators</span>
+          </div>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Recipients can upload Excel sheets, edit entries, and clear shift logs.</p>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="mobileShareUrlInput" readonly onclick="this.focus();this.select();" style="flex: 1; font-size: 11px; font-family: monospace; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+            <button class="btn btn-success btn-sm" id="copyMobileUrlBtn"><i class="fa-solid fa-copy"></i> Copy Edit Link</button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('mobileQrModalBackdrop').style.display='none'">Close</button>
         </div>
       </div>
     </div>
