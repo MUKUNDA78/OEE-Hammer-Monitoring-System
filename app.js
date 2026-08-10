@@ -322,6 +322,55 @@
     document.body.classList.add('view-only-active');
   }
 
+  function compressLogsForUrl(logs) {
+    if (!Array.isArray(logs)) return [];
+    return logs.map(l => [
+      l.date || '',
+      l.shift || 'Shift A',
+      l.machine || '1 Ton Hammer',
+      l.partNumber || 'A1#21',
+      l.plannedTimeMins || 660,
+      l.maintanceMins || 0,
+      l.dieRelatedMins || 0,
+      l.setupMins || 0,
+      l.noManpowerMins || 0,
+      l.heatingTimeMins || 0,
+      l.minorStopMins || 0,
+      l.totalParts || 0,
+      l.goodParts || 0,
+      l.rejects || 0,
+      l.idealCycleSec || 35
+    ]);
+  }
+
+  function decompressLogsFromUrl(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(r => {
+      if (Array.isArray(r)) {
+        return calculateOeeRecord({
+          date: r[0],
+          shift: r[1],
+          machine: r[2],
+          partNumber: r[3],
+          plannedTimeMins: r[4],
+          maintanceMins: r[5],
+          dieRelatedMins: r[6],
+          setupMins: r[7],
+          noManpowerMins: r[8],
+          heatingTimeMins: r[9],
+          minorStopMins: r[10],
+          totalParts: r[11],
+          goodParts: r[12],
+          rejects: r[13],
+          idealCycleSec: r[14]
+        });
+      } else if (typeof r === 'object' && r !== null) {
+        return calculateOeeRecord(r);
+      }
+      return null;
+    }).filter(Boolean);
+  }
+
   function checkUrlForSharedData() {
     try {
       const search = window.location.search;
@@ -338,11 +387,15 @@
 
       if (encodedPayload) {
         const jsonStr = decodeURIComponent(atob(encodedPayload));
-        const importedLogs = JSON.parse(jsonStr);
+        const parsed = JSON.parse(jsonStr);
+        const importedLogs = decompressLogsFromUrl(parsed);
+
         if (Array.isArray(importedLogs) && importedLogs.length > 0) {
           shiftLogs = importedLogs;
+          window.HAS_URL_DATA = true; // Protect URL loaded data from being overwritten by empty cloud files
           if (!isViewMode) saveShiftLogs();
-          showToast(`Loaded ${importedLogs.length} shift logs from shared URL!`, 'success');
+          renderAllViews();
+          showToast(`Successfully loaded ${importedLogs.length} shift logs with live data!`, 'success');
         }
       }
 
@@ -387,7 +440,8 @@
     }
 
     try {
-      const jsonStr = JSON.stringify(shiftLogs);
+      const compressedArr = compressLogsForUrl(shiftLogs);
+      const jsonStr = JSON.stringify(compressedArr);
       const encoded = btoa(encodeURIComponent(jsonStr));
 
       const viewOnlyUrl = `${window.location.origin}${window.location.pathname}?mode=view#data=${encoded}`;
@@ -403,7 +457,7 @@
 
       setTimeout(() => {
         if (viewOnlyInput) copyTextToClipboard(viewOnlyUrl, viewOnlyInput);
-        showToast(`View-Only Share Link selected & copied! (${shiftLogs.length} logs)`, 'success');
+        showToast(`View-Only Share Link selected & copied! (${shiftLogs.length} logs included)`, 'success');
       }, 100);
 
     } catch (err) {
@@ -515,7 +569,7 @@
           fetchedLogs = data.shiftLogs;
         }
 
-        if (fetchedLogs.length > 0) {
+        if (fetchedLogs.length > 0 && !window.HAS_URL_DATA) {
           shiftLogs = mergeLogArrays(shiftLogs, fetchedLogs);
           saveShiftLogs();
           renderAllViews();
