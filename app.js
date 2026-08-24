@@ -441,38 +441,53 @@
   }
 
   function generateShareableDataUrl() {
-    if (shiftLogs.length === 0) {
-      showToast('No shift logs to share yet. Upload Excel files first!', 'warning');
-      return;
+  try {
+    // Generate a true live, view-only Supabase dashboard link.
+    // No dashboard data is embedded in the URL.
+    const liveViewUrl =
+      `${window.location.origin}${window.location.pathname}?mode=view`;
+
+    const viewOnlyInput =
+      document.getElementById('viewOnlyShareUrlInput');
+
+    const editInput =
+      document.getElementById('mobileShareUrlInput');
+
+    const modal =
+      document.getElementById('mobileQrModalBackdrop');
+
+    if (viewOnlyInput) {
+      viewOnlyInput.value = liveViewUrl;
     }
 
-    try {
-      const compressedArr = compressLogsForUrl(shiftLogs);
-      const jsonStr = JSON.stringify(compressedArr);
-      const encoded = btoa(encodeURIComponent(jsonStr));
-
-      const viewOnlyUrl = `${window.location.origin}${window.location.pathname}?mode=view#data=${encoded}`;
-      const fullEditUrl = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
-      
-      const viewOnlyInput = document.getElementById('viewOnlyShareUrlInput');
-      const editInput = document.getElementById('mobileShareUrlInput');
-      const modal = document.getElementById('mobileQrModalBackdrop');
-
-      if (viewOnlyInput) viewOnlyInput.value = viewOnlyUrl;
-      if (editInput) editInput.value = fullEditUrl;
-      if (modal) modal.style.display = 'flex';
-
-      setTimeout(() => {
-        if (viewOnlyInput) copyTextToClipboard(viewOnlyUrl, viewOnlyInput);
-        showToast(`View-Only Share Link selected & copied! (${shiftLogs.length} logs included)`, 'success');
-      }, 100);
-
-    } catch (err) {
-      console.error(err);
-      showToast('Error generating share URL.', 'danger');
+    // Clear the old snapshot/edit link.
+    if (editInput) {
+      editInput.value = '';
     }
+
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+
+    setTimeout(() => {
+      if (viewOnlyInput) {
+        copyTextToClipboard(liveViewUrl, viewOnlyInput);
+      }
+
+      showToast(
+        'Live View-Only Link copied successfully!',
+        'success'
+      );
+    }, 100);
+
+  } catch (err) {
+    console.error('Error generating live share URL:', err);
+    showToast(
+      'Error generating live dashboard link.',
+      'danger'
+    );
   }
-
+}
   function mergeLogArrays(logsA, logsB) {
     const map = new Map();
     const getRecordKey = (l) => {
