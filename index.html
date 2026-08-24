@@ -1600,27 +1600,34 @@
 
   <!-- Supabase DB Connection Settings Modal -->
   <div class="modal-backdrop" id="supabaseConfigModal" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 99999;">
-    <div class="card" style="max-width: 500px; width: 92%; background: var(--bg-card); padding: 22px; border-radius: 12px; position: relative;">
+    <div class="card" style="max-width: 520px; width: 92%; background: var(--bg-card); padding: 24px; border-radius: 12px; position: relative;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-        <h3 style="font-size: 16px; color: var(--primary); margin: 0;"><i class="fa-solid fa-plug text-success"></i> Supabase Cloud DB Connection Config</h3>
+        <h3 style="font-size: 16px; color: var(--primary); margin: 0;"><i class="fa-solid fa-plug text-success"></i> Supabase Cloud DB Connection Settings</h3>
         <button class="btn btn-icon btn-sm" id="closeConfigModalBtn"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div>
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-          Configure your central Supabase PostgreSQL URL and Anon Key. These can also be supplied via <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>.
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
+          Enter your central Supabase credentials below. Supports the current Supabase Publishable Key (<code>sb_publishable_...</code>) or legacy <code>anon</code> key.
         </p>
 
+        <!-- Field 1: Supabase Project URL -->
         <div class="form-group mb-3">
-          <label style="font-size: 12px; font-weight: 600;">Supabase Project URL:</label>
-          <input type="text" id="cfgSupabaseUrl" placeholder="https://xyz.supabase.co" style="width: 100%; font-size: 12px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+          <label style="font-size: 12px; font-weight: 700; color: var(--text-main);"><i class="fa-solid fa-link text-primary"></i> 1. Supabase Project URL:</label>
+          <input type="text" id="cfgSupabaseUrl" placeholder="https://xyz.supabase.co" style="width: 100%; font-size: 12px; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
         </div>
 
+        <!-- Field 2: Supabase Publishable Key -->
         <div class="form-group mb-3">
-          <label style="font-size: 12px; font-weight: 600;">Supabase Anon Key:</label>
-          <input type="text" id="cfgSupabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." style="width: 100%; font-size: 11px; font-family: monospace; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+          <label style="font-size: 12px; font-weight: 700; color: var(--text-main);"><i class="fa-solid fa-key text-warning"></i> 2. Supabase Publishable Key:</label>
+          <input type="text" id="cfgSupabaseKey" placeholder="sb_publishable_... or legacy eyJhbGci..." style="width: 100%; font-size: 11px; font-family: monospace; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+          <small style="font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block;">
+            🔒 Safe for client-side/browser access. <strong>Never enter secret/service_role keys here.</strong>
+          </small>
         </div>
 
-        <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <div id="cfgConnectionStatusAlert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-top: 12px; font-weight: 600;"></div>
+
+        <div style="display: flex; gap: 8px; margin-top: 16px;">
           <button class="btn btn-success" id="saveSupabaseConfigBtn" style="flex: 1;"><i class="fa-solid fa-floppy-disk"></i> Save & Connect</button>
           <button class="btn btn-outline" id="testSupabaseConnectionBtn" style="flex: 1;"><i class="fa-solid fa-bolt"></i> Test Connection</button>
         </div>

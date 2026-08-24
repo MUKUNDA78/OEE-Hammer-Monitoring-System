@@ -550,9 +550,12 @@
   /* ==========================================================================
      CENTRAL SUPABASE CLOUD DATABASE, AUTH, REALTIME & RLS ENGINE
      ========================================================================== */
+  /* ==========================================================================
+     CENTRAL SUPABASE CLOUD DATABASE, AUTH, REALTIME & RLS ENGINE
+     ========================================================================== */
   function getSupabaseCredentials() {
     const url = window.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || '';
-    const key = window.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_key') || '';
+    const key = window.VITE_SUPABASE_PUBLISHABLE_KEY || window.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_key') || '';
     return { url, key };
   }
 
@@ -568,7 +571,7 @@
     if (url && key && typeof supabase !== 'undefined') {
       try {
         supabaseClient = supabase.createClient(url, key);
-        console.log('Supabase Cloud Database client connected.');
+        console.log('Supabase Cloud Database client initialized.');
         if (pill) {
           pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live Database Connected';
           pill.style.borderColor = 'var(--primary)';
@@ -580,14 +583,72 @@
         return true;
       } catch (err) {
         console.error('Supabase Client Error:', err);
+        if (pill) {
+          pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-triangle-exclamation text-danger"></i> 🔴 Database Connection Failed';
+          pill.style.borderColor = 'var(--danger)';
+        }
       }
     }
 
     if (pill) {
-      pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-plug text-warning"></i> 🟡 Local Mode (Set DB Config)';
+      pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-plug text-warning"></i> 🟡 Set DB Credentials (DB Config)';
       pill.style.borderColor = 'var(--warning)';
     }
     return false;
+  }
+
+  async function testSupabaseConnection(url, key) {
+    const alertDiv = document.getElementById('cfgConnectionStatusAlert');
+    const pill = document.getElementById('cloudDbStatusPill');
+
+    if (!url || !key) {
+      if (alertDiv) {
+        alertDiv.style.display = 'block';
+        alertDiv.style.background = 'rgba(220, 38, 38, 0.12)';
+        alertDiv.style.color = '#dc2626';
+        alertDiv.style.border = '1px solid #dc2626';
+        alertDiv.innerHTML = '🔴 <strong>Database Connection Failed:</strong> Please enter both Supabase Project URL and Publishable Key.';
+      }
+      return false;
+    }
+
+    try {
+      const testClient = supabase.createClient(url, key);
+      const { error } = await testClient.from('production_data').select('id').limit(1);
+
+      if (error && error.message && (error.message.includes('apiKey') || error.message.includes('JWT') || error.message.includes('invalid'))) {
+        throw new Error('Invalid Supabase Publishable Key or URL format.');
+      }
+
+      if (alertDiv) {
+        alertDiv.style.display = 'block';
+        alertDiv.style.background = 'rgba(22, 163, 74, 0.12)';
+        alertDiv.style.color = '#16a34a';
+        alertDiv.style.border = '1px solid #16a34a';
+        alertDiv.innerHTML = '🟢 <strong>Connected to Cloud Database!</strong> Single source of truth active.';
+      }
+
+      if (pill) {
+        pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live Database Connected';
+        pill.style.borderColor = 'var(--primary)';
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Supabase Connection Test Failed:', err);
+      if (alertDiv) {
+        alertDiv.style.display = 'block';
+        alertDiv.style.background = 'rgba(220, 38, 38, 0.12)';
+        alertDiv.style.color = '#dc2626';
+        alertDiv.style.border = '1px solid #dc2626';
+        alertDiv.innerHTML = `🔴 <strong>Database Connection Failed:</strong> ${err.message || 'Unable to reach Supabase server.'}`;
+      }
+      if (pill) {
+        pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-triangle-exclamation text-danger"></i> 🔴 Database Connection Failed';
+        pill.style.borderColor = 'var(--danger)';
+      }
+      return false;
+    }
   }
 
   /* Supabase Auth & Role-Based UI Permissions */
@@ -685,12 +746,27 @@
   function initSupabaseRealtimeSubscriptions() {
     if (!supabaseClient) return;
 
-    supabaseClient
-      .channel('schema-db-changes')
+    const pill = document.getElementById('cloudDbStatusPill');
+
+    const channel = supabaseClient.channel('schema-db-changes');
+
+    channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'production_data' }, () => fetchSupabaseShiftLogs())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'quality_data' }, () => fetchSupabaseShiftLogs())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'downtime_data' }, () => fetchSupabaseShiftLogs())
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          if (pill) {
+            pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live Database';
+            pill.style.borderColor = 'var(--primary)';
+          }
+        } else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          if (pill) {
+            pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-spinner fa-spin text-warning"></i> 🟠 Reconnecting';
+            pill.style.borderColor = 'var(--warning)';
+          }
+        }
+      });
   }
 
   function initSupabasePresence() {
@@ -3450,22 +3526,34 @@
     const closeCfgBtn = document.getElementById('closeConfigModalBtn');
     const cfgModal = document.getElementById('supabaseConfigModal');
     const saveCfgBtn = document.getElementById('saveSupabaseConfigBtn');
+    const testCfgBtn = document.getElementById('testSupabaseConnectionBtn');
 
     if (openCfgBtn) openCfgBtn.addEventListener('click', () => cfgModal.style.display = 'flex');
     if (closeCfgBtn) closeCfgBtn.addEventListener('click', () => cfgModal.style.display = 'none');
 
+    if (testCfgBtn) {
+      testCfgBtn.addEventListener('click', async () => {
+        const url = document.getElementById('cfgSupabaseUrl').value.trim();
+        const key = document.getElementById('cfgSupabaseKey').value.trim();
+        await testSupabaseConnection(url, key);
+      });
+    }
+
     if (saveCfgBtn) {
-      saveCfgBtn.addEventListener('click', () => {
+      saveCfgBtn.addEventListener('click', async () => {
         const url = document.getElementById('cfgSupabaseUrl').value.trim();
         const key = document.getElementById('cfgSupabaseKey').value.trim();
         if (url && key) {
-          localStorage.setItem('supabase_url', url);
-          localStorage.setItem('supabase_key', key);
-          initSupabaseClient();
-          cfgModal.style.display = 'none';
-          showToast('Supabase connection settings saved!', 'success');
+          const success = await testSupabaseConnection(url, key);
+          if (success) {
+            localStorage.setItem('supabase_url', url);
+            localStorage.setItem('supabase_key', key);
+            initSupabaseClient();
+            setTimeout(() => { cfgModal.style.display = 'none'; }, 1200);
+            showToast('Connected to Cloud Database!', 'success');
+          }
         } else {
-          showToast('Please enter both Supabase URL and Anon Key.', 'warning');
+          showToast('Please enter both Supabase URL and Publishable Key.', 'warning');
         }
       });
     }
