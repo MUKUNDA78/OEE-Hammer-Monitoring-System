@@ -1,89 +1,139 @@
-# 🏭 GRS Engineering Pvt Ltd Unit 1 - OEE Monitoring & Analytics System
+# 🏭 GRS Engineering Pvt Ltd Unit 1 - OEE & Quality Monitoring Cloud System
 
-An industrial-grade, 5-hammer fleet efficiency monitoring and production analytics web application designed for forging plants. Features real-time visual OEE gauges, 12-hour shift system accounting, exact 17-column plant Excel imports with instant auto-commit, hammer-wise separate sheet uploads, part number analytics, and month-by-month trend performance tracking.
+An industrial-grade, multi-user 5-hammer fleet efficiency, OEE monitoring, and Quality Activity Analytics web application powered by **Supabase PostgreSQL**, WebSockets Realtime, Supabase Authentication, and Row Level Security (RLS).
 
-![OEE System Banner](https://img.shields.io/badge/System-OEE_Fleet_Monitor-16a34a?style=for-the-badge&logo=industry)
+![OEE System Banner](https://img.shields.io/badge/System-Supabase_Realtime_Cloud_OEE-16a34a?style=for-the-badge&logo=supabase)
+![Security](https://img.shields.io/badge/Security-RLS_PostgreSQL_Auth-0284c7?style=for-the-badge&logo=postgresql)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-![Tech](https://img.shields.io/badge/Stack-HTML5_|_CSS3_|_JavaScript_|_Chart.js_|_SheetJS-0284c7?style=for-the-badge)
 
 ---
 
-## 🌟 Key Features
+## 🌟 Architecture & Highlights
 
-### 🔨 1. Fleet Equipment Specifications (5 Hammers)
-- **1 Ton Hammer** (Capacity: `1.0 Ton` | Standard Cycle: `35 sec`)
-- **1.5 Ton Hammer** (Capacity: `1.5 Ton` | Standard Cycle: `42 sec`)
-- **2.5 Ton (Old) Hammer** (Capacity: `2.5 Ton (Old)` | Standard Cycle: `55 sec`)
-- **2.5 Ton (New) Hammer** (Capacity: `2.5 Ton (New)` | Standard Cycle: `48 sec`)
-- **3.5 Ton Hammer** (Capacity: `3.5 Ton` | Standard Cycle: `70 sec`)
+1. **Central Cloud Database (Supabase PostgreSQL)**:
+   - Single source of truth across desktop, laptop, tablet, and mobile devices.
+   - Tables: `production_data`, `quality_data`, `downtime_data`, and `profiles`.
+   - Soft-delete support (`is_deleted`, `deleted_by`, `deleted_at`) and audit timestamps (`created_by`, `created_at`, `updated_at`).
+   - Maintains **Rework** and **Rejection** quantities separately.
 
-### ⏱️ 2. 12-Hour Shift System & Planned Operating Time Base
-- **2 x 12-Hour Shifts**:
-  - `Shift A`: `08:00 - 20:00`
-  - `Shift B`: `20:00 - 08:00`
-- **Break Accounting**: Excludes 30m Lunch + 30m Tea (2x15m) = 60m planned non-working breaks.
-- **Net Planned Operating Base Time**: **660 Minutes (11.0 Hours)**.
+2. **Real-time WebSockets & Presence**:
+   - Near real-time bi-directional WebSocket data sync across all connected users without browser refresh.
+   - Real-time Connection Pill: 🟢 `Live Database Connected` | 🔴 `Offline / Reconnecting`.
+   - Real-time Presence Indicator: Displays online user count (e.g. `🟢 4 Users Online`) with role/department breakdown popover.
 
-### 📊 3. Industrial OEE Mathematical Engine
-- **Availability ($A$)**:
-  $$A = \frac{\text{Operating Time (660m - Total Downtime)}}{660\text{ Mins}} \times 100$$
-- **Performance ($P$)**:
-  $$P = \frac{(\text{Total Parts} \times \text{Ideal Cycle Sec}) / 60}{\text{Operating Time Mins}} \times 100$$
-- **Quality ($Q$)**:
-  $$Q = \frac{\text{Good Parts}}{\text{Total Parts}} \times 100$$
-- **Overall OEE**:
-  $$\text{OEE \%} = A \times P \times Q$$
+3. **Supabase Auth & Role-Based Access Control (RLS)**:
+   - 6 System Roles:
+     - `Admin`: Full access, user management, complete database control.
+     - `Quality`: Add/edit quality records, view quality activity monitor, production, and downtime.
+     - `Production`: Add/edit production & in-process shift records.
+     - `Maintenance`: Add/edit downtime records.
+     - `Management`: Read-only access to all dashboards and reports.
+     - `Viewer`: Read-only access.
+   - Strict Row Level Security (RLS) policies prevent unauthorized modifications.
 
-### 📂 4. Exact 17-Column Plant Excel Import & Auto-Commit System
-Supports exact plant Excel columns:
-`Date`, `Shift`, `Machine`, `part number`, `Planned time`, `Maintance`, `die related`, `setup`, `No manpower`, `Heating time`, `minor stop`, `total downtime`, `operating time`, `total parts`, `good parts`, `rejects`, `ideal cycle time`.
+4. **Quality Activity Monitor**:
+   - Dedicated tab with strict filter isolation (`Month`, `Inspection Stage`: `In-Process`, `Final Inspection`, `MPI`, `Part Number`, `Defect Reason`).
+   - Metrics: Total Inspected, Total Rework, Total Rejection, Rework %, Rejection %.
+   - Part-Wise Rework Analysis & Part-Wise Rejection Analysis tables.
+   - Reason-Wise Defect Pareto Chart.
+   - Monthly Rework & Rejection Trend Charts.
+   - Top 10 Rework Reasons & Top 10 Rejection Reasons.
 
-- **Instant Auto-Commit**: Selecting or dropping an Excel file immediately parses, normalizes units, calculates OEE, saves logs, and switches to the Overview Dashboard.
-- **Separate Hammer Excel Upload Cards**: Option for each hammer to upload its Excel sheet separately with dedicated cards, dropzones, log count badges, and template downloads.
-- **Fuzzy Header Matcher & Unit Normalizer**:
-  - Handles variations in column names (ignores spaces, symbols, parens, case).
-  - Automatically converts hours (`11h`, `12h`, `1.5h`) to minutes.
-  - Automatically converts cycle times (`< 3` min/pc $\rightarrow$ sec/pc, `> 300` pcs/hr $\rightarrow$ sec/pc).
-
-### 🔍 5. Part Number & Machine Analysis
-- Alphanumeric plant part numbers (`A1#21`, `W1#164`, `A4#07`, `C2#14`, `B3#88`, `M5#102`).
-- Interactive Hammer Sub-Nav selector (`All 5 Hammers Combined`, `1 Ton`, `1.5 Ton`, `2.5T Old`, `2.5T New`, `3.5 Ton`).
-- Tracks top setup times, die downtime, and furnace heating delays for each individual machine.
-
-### 📅 6. Month-Wise Performance & Dynamic Month Selector
-- **Dynamic Month Selector**: Top navigation filter allows selecting specific production months (`Jan 2026`, `Feb 2026`, `Jul 2026`, `All Months Combined`).
-- **Month-Wise OEE Trend Chart**: Plots 6 trend lines (Overall Fleet Average + all 5 individual hammers).
-- **Monthly Performance Matrix Table**: Month-by-month breakdown of shift count, total produced parts, overall OEE, and hammer-wise OEE.
+5. **Excel Import Validation & Categorization**:
+   - Validates dates, part numbers, quantities, inspection stages, and downtime categories.
+   - Compares rows against existing database records to detect duplicates.
+   - Categorizes rows into **`New Valid Records`**, **`Duplicate Records`**, and **`Error / Invalid Records`** prior to final insertion.
 
 ---
 
-## 🚀 How to Run Locally
+## ⚡ Supabase Setup & Execution Instructions
 
-1. Double click `start_app.bat` or run:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File server.ps1
-   ```
-2. Open your web browser at:
-   ```
-   http://localhost:8080
-   ```
-3. Or open `index.html` directly in any browser.
+### Step 1: Create a Supabase Project
+1. Log in to [Supabase Dashboard](https://database.new).
+2. Click **New Project** -> Enter Name: `grs-unit1-oee-quality-monitor`.
+3. Set Database Password & select Region -> Click **Create New Project**.
+4. Navigate to **Project Settings** -> **API**:
+   - Copy **Project URL** (`https://xyz.supabase.co`)
+   - Copy **Anon / Public API Key** (`eyJhbGci...`)
+
+### Step 2: Execute Database DDL Schema Script
+1. In Supabase Dashboard, open the **SQL Editor** (`/project/_/sql`).
+2. Open the included [`supabase_schema.sql`](file:///C:/Users/mukun/.gemini/antigravity/scratch/oee-hammer-monitor/supabase_schema.sql) file.
+3. Paste the contents into the SQL Editor and click **Run**.
+4. This creates:
+   - `profiles`, `production_data`, `quality_data`, and `downtime_data` tables.
+   - Indexes, triggers, updated_at handlers, and automatic profile creation triggers.
+   - Enables Realtime publications (`ALTER PUBLICATION supabase_realtime ADD TABLE ...`).
+   - Applies Row Level Security (RLS) policies for all 6 roles.
+
+### Step 3: Configure Environment Variables or UI Connection Modal
+- For local / static hosting, click **`DB Config`** in the application header and paste your `Supabase Project URL` and `Supabase Anon Key`.
+- For Vite / bundler builds, set environment variables:
+  ```env
+  VITE_SUPABASE_URL=https://xyz.supabase.co
+  VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR...
+  ```
 
 ---
 
-## 📁 Repository Structure
+## 👤 User Creation Guide (Creating Users for All 6 Roles)
+
+### Creating the First Admin User:
+1. Open the application -> Click **`Login / Register`** -> Select **`Create Account`**.
+2. Register:
+   - Email: `admin@grsengineering.com`
+   - Password: `YourSecurePassword123`
+   - Employee Name: `Plant Admin`
+   - Department: `Administration`
+   - Role: `Admin`
+3. Click **Create Supabase Account**.
+
+### Adding Operational Users:
+Repeat the signup process or create users directly in Supabase **Authentication** -> **Users**:
+- **Quality User**: Role = `Quality`, Dept = `Quality` (e.g. `quality@grsengineering.com`)
+- **Production User**: Role = `Production`, Dept = `Production` (e.g. `prod@grsengineering.com`)
+- **Maintenance User**: Role = `Maintenance`, Dept = `Maintenance` (e.g. `maint@grsengineering.com`)
+- **Management User**: Role = `Management`, Dept = `Management` (e.g. `management@grsengineering.com`)
+- **Viewer User**: Role = `Viewer`, Dept = `Operations` (e.g. `viewer@grsengineering.com`)
+
+---
+
+## 🧪 Simultaneous Multi-User Testing Procedure
+
+To verify real-time bi-directional sync across multiple devices/computers:
+
+1. **Window / Computer 1 (Operator)**:
+   - Log in as `Production` or `Quality`.
+   - Open Manual Entry Form or Excel Import and insert a shift entry for `1.5 Ton Hammer` (Part `W1#164`).
+   - Click **Save**.
+
+2. **Window / Computer 2 (Management / Mobile Phone)**:
+   - Open the application link on another computer or phone as `Management`.
+   - Notice that the **Overview Dashboard**, **Quality Activity Monitor**, and **Shift Table** automatically receive the new record via WebSockets **without manually refreshing the page**!
+   - Observe the presence indicator displaying `🟢 2 Users Online`.
+
+---
+
+## 🌐 Deployment Instructions
+
+### Deployment to Netlify / Vercel / Custom Company Domain:
+1. Push repository to GitHub.
+2. Connect repository to Netlify or Vercel.
+3. Set Build Environment Variables:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. Access via company domain (e.g. `https://quality-monitor.grsengineering.com`).
+
+---
+
+## 📜 Repository Files
 
 ```
 oee-hammer-monitor/
-├── index.html       # Application HTML5 Layout & Views
-├── styles.css       # Light Green / Mint Industrial Styling & Dark Mode
-├── app.js           # Robust Excel Parser & Mathematical OEE Engine
-├── server.ps1       # Local PowerShell Web Server
-├── start_app.bat    # Windows 1-Click Server Launcher
-└── README.md        # System Documentation
+├── index.html           # HTML5 Layout with Quality Monitor & Auth Modals
+├── styles.css           # Industrial Mint Theme, Presence & Quality Monitor CSS
+├── app.js               # Supabase Engine, Auth, Realtime, Quality Analytics
+├── supabase_schema.sql  # Supabase PostgreSQL DDL, Triggers, Realtime & RLS Policies
+├── grs_logo.png         # Official GRS Engineering Pvt Ltd Logo
+└── README.md            # Complete Setup & User Guide
 ```
-
----
-
-## 📜 License
-Developed for Industrial Forge Plant Efficiency Monitoring. Released under MIT License.

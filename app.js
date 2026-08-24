@@ -9,11 +9,18 @@
 
   // State Management
   let shiftLogs = [];
+  let qualityLogs = [];
   let excelImportBuffer = [];
   let currentImportHammer = null; // null for combined, or hammer name string
   let charts = {};
   let currentTheme = localStorage.getItem('oee_theme') || 'light-green';
   let selectedSubnavHammer = 'ALL';
+
+  // Supabase State & Auth
+  let supabaseClient = null;
+  let currentUserProfile = null;
+  let currentAuthUser = null;
+  let presenceChannel = null;
 
   // Target Equipment Specification
   const HAMMERS = [
@@ -45,8 +52,8 @@
     setupExcelDropZone();
     setupHammerMiniDropzones();
     setupCloudDbSync();
+    initSupabaseClient();
     renderAllViews();
-    pullFromCloudDb(true);
   });
 
   /* ==========================================================================
@@ -540,6 +547,283 @@
     }
   }
 
+  /* ==========================================================================
+     CENTRAL SUPABASE CLOUD DATABASE, AUTH, REALTIME & RLS ENGINE
+     ========================================================================== */
+  function getSupabaseCredentials() {
+    const url = window.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || '';
+    const key = window.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_key') || '';
+    return { url, key };
+  }
+
+  function initSupabaseClient() {
+    const { url, key } = getSupabaseCredentials();
+    const pill = document.getElementById('cloudDbStatusPill');
+
+    const urlInput = document.getElementById('cfgSupabaseUrl');
+    const keyInput = document.getElementById('cfgSupabaseKey');
+    if (urlInput && url) urlInput.value = url;
+    if (keyInput && key) keyInput.value = key;
+
+    if (url && key && typeof supabase !== 'undefined') {
+      try {
+        supabaseClient = supabase.createClient(url, key);
+        console.log('Supabase Cloud Database client connected.');
+        if (pill) {
+          pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live Database Connected';
+          pill.style.borderColor = 'var(--primary)';
+        }
+        initSupabaseAuth();
+        initSupabaseRealtimeSubscriptions();
+        initSupabasePresence();
+        fetchSupabaseShiftLogs();
+        return true;
+      } catch (err) {
+        console.error('Supabase Client Error:', err);
+      }
+    }
+
+    if (pill) {
+      pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-plug text-warning"></i> 🟡 Local Mode (Set DB Config)';
+      pill.style.borderColor = 'var(--warning)';
+    }
+    return false;
+  }
+
+  /* Supabase Auth & Role-Based UI Permissions */
+  function initSupabaseAuth() {
+    if (!supabaseClient) return;
+
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        handleUserLoggedIn(session.user);
+      }
+    });
+
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        handleUserLoggedIn(session.user);
+      } else {
+        handleUserLoggedOut();
+      }
+    });
+  }
+
+  function handleUserLoggedIn(user) {
+    currentAuthUser = user;
+    
+    supabaseClient
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          currentUserProfile = data;
+          updateUserProfileBadge(data);
+          applyRolePermissions(data.role);
+          showToast(`Welcome back, ${data.employee_name} (${data.role})!`, 'success');
+        } else {
+          const empName = user.user_metadata?.employee_name || user.email.split('@')[0];
+          const role = user.user_metadata?.role || 'Production';
+          const dept = user.user_metadata?.department || 'Production';
+          currentUserProfile = { user_id: user.id, employee_name: empName, role, department: dept };
+          updateUserProfileBadge(currentUserProfile);
+          applyRolePermissions(role);
+        }
+      });
+  }
+
+  function handleUserLoggedOut() {
+    currentAuthUser = null;
+    currentUserProfile = null;
+    const badge = document.getElementById('userProfileBadge');
+    const openAuthBtn = document.getElementById('openAuthModalBtn');
+    if (badge) badge.style.display = 'none';
+    if (openAuthBtn) openAuthBtn.style.display = 'inline-flex';
+    applyRolePermissions('Viewer');
+    showToast('Logged out of Supabase system.', 'info');
+  }
+
+  function updateUserProfileBadge(profile) {
+    const badge = document.getElementById('userProfileBadge');
+    const openAuthBtn = document.getElementById('openAuthModalBtn');
+    const avatar = document.getElementById('userAvatar');
+    const empName = document.getElementById('userEmpName');
+    const roleDept = document.getElementById('userRoleDept');
+
+    if (badge && profile) {
+      if (avatar) avatar.textContent = (profile.employee_name || 'U').charAt(0).toUpperCase();
+      if (empName) empName.textContent = profile.employee_name || 'Employee';
+      if (roleDept) roleDept.textContent = `${profile.role || 'User'} | ${profile.department || 'Plant'}`;
+      badge.style.display = 'inline-flex';
+      if (openAuthBtn) openAuthBtn.style.display = 'none';
+    }
+  }
+
+  function applyRolePermissions(role) {
+    const isViewerOrMgmt = role === 'Viewer' || role === 'Management';
+    
+    const manualBtn = document.getElementById('openManualEntryBtn');
+    const excelBtn = document.getElementById('openExcelModalBtn');
+    const clearBtn = document.getElementById('clearDemoDataHeaderBtn');
+    
+    if (isViewerOrMgmt) {
+      if (manualBtn) manualBtn.style.display = 'none';
+      if (excelBtn) excelBtn.style.display = 'none';
+      if (clearBtn) clearBtn.style.display = 'none';
+      window.IS_VIEW_ONLY = true;
+    } else {
+      if (manualBtn) manualBtn.style.display = 'inline-flex';
+      if (excelBtn) excelBtn.style.display = 'inline-flex';
+      if (clearBtn) clearBtn.style.display = role === 'Admin' ? 'inline-flex' : 'none';
+      window.IS_VIEW_ONLY = false;
+    }
+  }
+
+  /* Supabase Realtime Subscriptions & Presence */
+  function initSupabaseRealtimeSubscriptions() {
+    if (!supabaseClient) return;
+
+    supabaseClient
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_data' }, () => fetchSupabaseShiftLogs())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quality_data' }, () => fetchSupabaseShiftLogs())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'downtime_data' }, () => fetchSupabaseShiftLogs())
+      .subscribe();
+  }
+
+  function initSupabasePresence() {
+    if (!supabaseClient) return;
+
+    presenceChannel = supabaseClient.channel('online-users', {
+      config: { presence: { key: currentAuthUser ? currentAuthUser.id : 'anon_' + Math.random().toString(36).substr(2, 6) } }
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const userCount = Object.keys(state).length;
+        const countSpan = document.getElementById('presenceCount');
+        const userListDiv = document.getElementById('presenceUserList');
+
+        if (countSpan) countSpan.textContent = `${userCount} User${userCount > 1 ? 's' : ''} Online`;
+
+        if (userListDiv) {
+          userListDiv.innerHTML = '';
+          Object.values(state).forEach(presences => {
+            presences.forEach(p => {
+              const name = p.name || 'Plant Operator';
+              const role = p.role || 'Production';
+              const row = document.createElement('div');
+              row.className = 'presence-user-row';
+              row.innerHTML = `<span>${name} (${role})</span><span class="badge badge-success">Online</span>`;
+              userListDiv.appendChild(row);
+            });
+          });
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            name: currentUserProfile ? currentUserProfile.employee_name : 'Guest User',
+            role: currentUserProfile ? currentUserProfile.role : 'Viewer',
+            onlineAt: new Date().toISOString()
+          });
+        }
+      });
+  }
+
+  /* Single Source of Truth Fetcher */
+  function fetchSupabaseShiftLogs() {
+    if (!supabaseClient) return;
+
+    const pill = document.getElementById('cloudDbStatusPill');
+
+    Promise.all([
+      supabaseClient.from('production_data').select('*').eq('is_deleted', false),
+      supabaseClient.from('quality_data').select('*').eq('is_deleted', false),
+      supabaseClient.from('downtime_data').select('*').eq('is_deleted', false)
+    ]).then(([prodRes, qualRes, downRes]) => {
+      if (prodRes.error) throw prodRes.error;
+
+      const prodList = prodRes.data || [];
+      const qualList = qualRes.data || [];
+      const downList = downRes.data || [];
+
+      qualityLogs = qualList;
+
+      const downMap = new Map();
+      downList.forEach(d => {
+        const key = `${d.date}_${d.shift}_${d.hammer}_${d.part_number}`;
+        if (!downMap.has(key)) {
+          downMap.set(key, { maintanceMins: 0, dieRelatedMins: 0, setupMins: 0, noManpowerMins: 0, heatingTimeMins: 0, minorStopMins: 0 });
+        }
+        const record = downMap.get(key);
+        const mins = parseNum(d.downtime_minutes);
+        switch (d.downtime_category) {
+          case 'Maintenance': record.maintanceMins += mins; break;
+          case 'Die Related': record.dieRelatedMins += mins; break;
+          case 'Setup': record.setupMins += mins; break;
+          case 'No Manpower': record.noManpowerMins += mins; break;
+          case 'Heating Time': record.heatingTimeMins += mins; break;
+          case 'Minor Stop': record.minorStopMins += mins; break;
+        }
+      });
+
+      const qualMap = new Map();
+      qualList.forEach(q => {
+        const key = `${q.date}_${q.shift}_${q.hammer}_${q.part_number}`;
+        if (!qualMap.has(key)) qualMap.set(key, { rework_qty: 0, rejection_qty: 0 });
+        const item = qualMap.get(key);
+        item.rework_qty += parseNum(q.rework_qty);
+        item.rejection_qty += parseNum(q.rejection_qty);
+      });
+
+      const fetchedLogs = prodList.map(p => {
+        const key = `${p.date}_${p.shift}_${p.hammer}_${p.part_number}`;
+        const downInfo = downMap.get(key) || { maintanceMins: 0, dieRelatedMins: 0, setupMins: 0, noManpowerMins: 0, heatingTimeMins: 0, minorStopMins: 0 };
+        const qualInfo = qualMap.get(key) || { rework_qty: 0, rejection_qty: 0 };
+
+        return calculateOeeRecord({
+          id: p.id,
+          date: p.date,
+          shift: p.shift,
+          machine: p.hammer,
+          partNumber: p.part_number,
+          plannedTimeMins: parseNum(p.planned_time_mins, 660),
+          maintanceMins: downInfo.maintanceMins,
+          dieRelatedMins: downInfo.dieRelatedMins,
+          setupMins: downInfo.setupMins,
+          noManpowerMins: downInfo.noManpowerMins,
+          heatingTimeMins: downInfo.heatingTimeMins,
+          minorStopMins: downInfo.minorStopMins,
+          totalParts: parseNum(p.production_qty),
+          goodParts: parseNum(p.good_qty),
+          rejects: parseNum(p.production_qty) - parseNum(p.good_qty),
+          rework: qualInfo.rework_qty,
+          idealCycleSec: parseNum(p.ideal_cycle_sec, 45)
+        });
+      });
+
+      if (fetchedLogs.length > 0) {
+        shiftLogs = fetchedLogs;
+        saveShiftLogs();
+        renderAllViews();
+        if (pill) {
+          pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live DB (${shiftLogs.length} logs)`;
+          pill.style.borderColor = 'var(--primary)';
+        }
+      }
+    }).catch(err => {
+      console.warn('Supabase fetch warning:', err);
+      if (pill) {
+        pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-triangle-exclamation text-danger"></i> 🔴 Connection Lost / Retrying';
+        pill.style.borderColor = 'var(--danger)';
+      }
+    });
+  }
+
   let cloudSyncTimer = null;
   const defaultCloudEndpoint = 'https://raw.githubusercontent.com/MUKUNDA78/OEE-Hammer-Monitoring-System/master/shift_logs_db.json';
 
@@ -753,19 +1037,362 @@
      ========================================================================== */
   function renderAllViews() {
     shiftLogs = shiftLogs.map(l => calculateOeeRecord(l));
-    updateMonthFilterOptions();
     const logs = getFilteredLogs();
-
+    updateMonthFilterOptions();
     updateHammerLogCountBadges();
     renderOverviewKpis(logs);
     renderHammerGauges(logs);
-    renderTrendChart(logs);
-    renderComponentsChart(logs);
-    renderMonthlyTrendView(shiftLogs); // Always show all months history in the Month-Wise Trend section
+    renderMonthlyTrendView(logs);
     renderInsightsView(logs);
     renderComparisonView(logs);
     renderDowntimeView(logs);
     renderLogsTable(logs);
+    renderQualityActivityMonitor();
+  }
+
+  /* ==========================================================================
+     QUALITY ACTIVITY MONITOR & DEFECT ANALYTICS ENGINE
+     ========================================================================== */
+  function renderQualityActivityMonitor() {
+    const monthFilter = document.getElementById('qmMonthFilter');
+    const stageFilter = document.getElementById('qmStageFilter');
+    const partFilter = document.getElementById('qmPartFilter');
+    const reasonFilter = document.getElementById('qmReasonFilter');
+
+    if (!monthFilter || !stageFilter) return;
+
+    populateQualityFilterOptions();
+
+    const selectedMonth = monthFilter.value;
+    const selectedStage = stageFilter.value;
+    const selectedPart = partFilter.value;
+    const selectedReason = reasonFilter.value;
+
+    const filteredQuality = qualityLogs.filter(q => {
+      if (selectedMonth !== 'ALL' && q.date && !q.date.startsWith(selectedMonth)) return false;
+      if (selectedStage !== 'ALL' && q.inspection_stage !== selectedStage) return false;
+      if (selectedPart !== 'ALL' && q.part_number !== selectedPart) return false;
+      if (selectedReason !== 'ALL' && (q.reason !== selectedReason && q.rework_reason !== selectedReason && q.rejection_reason !== selectedReason)) return false;
+      return true;
+    });
+
+    let totalInspected = 0;
+    let totalRework = 0;
+    let totalRejection = 0;
+
+    filteredQuality.forEach(q => {
+      totalInspected += parseNum(q.inspection_qty);
+      totalRework += parseNum(q.rework_qty);
+      totalRejection += parseNum(q.rejection_qty);
+    });
+
+    const reworkPct = totalInspected > 0 ? ((totalRework / totalInspected) * 100).toFixed(1) : '0.0';
+    const rejectionPct = totalInspected > 0 ? ((totalRejection / totalInspected) * 100).toFixed(1) : '0.0';
+
+    document.getElementById('qmTotalInspected').textContent = `${totalInspected.toLocaleString()} pcs`;
+    document.getElementById('qmTotalRework').textContent = `${totalRework.toLocaleString()} pcs`;
+    document.getElementById('qmTotalRejection').textContent = `${totalRejection.toLocaleString()} pcs`;
+    document.getElementById('qmReworkPct').textContent = `Rework: ${reworkPct}%`;
+    document.getElementById('qmRejectionPct').textContent = `Rejection: ${rejectionPct}%`;
+    document.getElementById('qmRecordCountBadge').textContent = `${filteredQuality.length} Records`;
+
+    renderQualityRecordsTable(filteredQuality);
+    renderPartWiseQualityTables(filteredQuality);
+    renderQualityCharts(filteredQuality);
+    renderTopQualityReasons(filteredQuality);
+  }
+
+  function populateQualityFilterOptions() {
+    const monthSel = document.getElementById('qmMonthFilter');
+    const partSel = document.getElementById('qmPartFilter');
+    const reasonSel = document.getElementById('qmReasonFilter');
+
+    if (!monthSel || !partSel || !reasonSel) return;
+
+    const curMonth = monthSel.value;
+    const curPart = partSel.value;
+    const curReason = reasonSel.value;
+
+    const monthSet = new Set();
+    const partSet = new Set();
+    const reasonSet = new Set();
+
+    qualityLogs.forEach(q => {
+      if (q.date && q.date.length >= 7) monthSet.add(q.date.substring(0, 7));
+      if (q.part_number) partSet.add(q.part_number);
+      if (q.reason) reasonSet.add(q.reason);
+      if (q.rework_reason) reasonSet.add(q.rework_reason);
+      if (q.rejection_reason) reasonSet.add(q.rejection_reason);
+    });
+
+    if (monthSel.options.length <= 1) {
+      monthSel.innerHTML = '<option value="ALL">All Months</option>';
+      Array.from(monthSet).sort().reverse().forEach(m => {
+        monthSel.innerHTML += `<option value="${m}">${m}</option>`;
+      });
+    }
+
+    if (partSel.options.length <= 1) {
+      partSel.innerHTML = '<option value="ALL">All Part Numbers</option>';
+      Array.from(partSet).sort().forEach(p => {
+        partSel.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+    }
+
+    if (reasonSel.options.length <= 1) {
+      reasonSel.innerHTML = '<option value="ALL">All Defect Reasons</option>';
+      Array.from(reasonSet).sort().forEach(r => {
+        reasonSel.innerHTML += `<option value="${r}">${r}</option>`;
+      });
+    }
+
+    monthSel.value = curMonth || 'ALL';
+    partSel.value = curPart || 'ALL';
+    reasonSel.value = curReason || 'ALL';
+  }
+
+  function renderQualityRecordsTable(logs) {
+    const tbody = document.getElementById('qmTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (logs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--text-muted); padding: 20px;">No quality records found matching selected filters.</td></tr>`;
+      return;
+    }
+
+    logs.forEach(q => {
+      const insPcs = parseNum(q.inspection_qty);
+      const rewPcs = parseNum(q.rework_qty);
+      const rejPcs = parseNum(q.rejection_qty);
+      const rewPct = insPcs > 0 ? ((rewPcs / insPcs) * 100).toFixed(1) : '0.0';
+      const rejPct = insPcs > 0 ? ((rejPcs / insPcs) * 100).toFixed(1) : '0.0';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${q.date}</td>
+        <td><span class="badge badge-info">${q.shift || 'Shift A'}</span></td>
+        <td><strong>${q.hammer || 'Fleet'}</strong></td>
+        <td><strong style="color: var(--primary);">${q.part_number}</strong></td>
+        <td><span class="badge badge-primary">${q.inspection_stage}</span></td>
+        <td>${insPcs.toLocaleString()}</td>
+        <td><span class="text-warning" style="font-weight: 700;">${rewPcs}</span></td>
+        <td>${rewPct}%</td>
+        <td><span class="text-danger" style="font-weight: 700;">${rejPcs}</span></td>
+        <td>${rejPct}%</td>
+        <td>${q.rework_reason || q.reason || '-'}</td>
+        <td>${q.rejection_reason || q.reason || '-'}</td>
+        <td><small>${q.created_by ? 'User #' + String(q.created_by).substring(0, 6) : 'Operator'}</small></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderPartWiseQualityTables(logs) {
+    const rewBody = document.getElementById('qmPartReworkTableBody');
+    const rejBody = document.getElementById('qmPartRejectionTableBody');
+
+    if (!rewBody || !rejBody) return;
+    rewBody.innerHTML = '';
+    rejBody.innerHTML = '';
+
+    const partMap = new Map();
+    logs.forEach(q => {
+      if (!partMap.has(q.part_number)) {
+        partMap.set(q.part_number, { inspected: 0, rework: 0, rejection: 0 });
+      }
+      const item = partMap.get(q.part_number);
+      item.inspected += parseNum(q.inspection_qty);
+      item.rework += parseNum(q.rework_qty);
+      item.rejection += parseNum(q.rejection_qty);
+    });
+
+    const parts = Array.from(partMap.entries());
+
+    const reworkParts = [...parts].sort((a, b) => b[1].rework - a[1].rework).filter(p => p[1].rework > 0);
+    if (reworkParts.length === 0) {
+      rewBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 14px;">No rework recorded.</td></tr>`;
+    } else {
+      reworkParts.forEach(([part, data]) => {
+        const pct = data.inspected > 0 ? ((data.rework / data.inspected) * 100).toFixed(1) : '0.0';
+        rewBody.innerHTML += `
+          <tr>
+            <td><strong>${part}</strong></td>
+            <td>${data.inspected.toLocaleString()}</td>
+            <td><strong class="text-warning">${data.rework}</strong></td>
+            <td>${pct}%</td>
+            <td><span class="badge ${pct > 3 ? 'badge-danger' : 'badge-warning'}">${pct > 3 ? 'High Rework' : 'Moderate'}</span></td>
+          </tr>
+        `;
+      });
+    }
+
+    const rejectionParts = [...parts].sort((a, b) => b[1].rejection - a[1].rejection).filter(p => p[1].rejection > 0);
+    if (rejectionParts.length === 0) {
+      rejBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 14px;">No rejections recorded.</td></tr>`;
+    } else {
+      rejectionParts.forEach(([part, data]) => {
+        const pct = data.inspected > 0 ? ((data.rejection / data.inspected) * 100).toFixed(1) : '0.0';
+        rejBody.innerHTML += `
+          <tr>
+            <td><strong>${part}</strong></td>
+            <td>${data.inspected.toLocaleString()}</td>
+            <td><strong class="text-danger">${data.rejection}</strong></td>
+            <td>${pct}%</td>
+            <td><span class="badge ${pct > 2 ? 'badge-danger' : 'badge-warning'}">${pct > 2 ? 'Critical Scrap' : 'Monitor'}</span></td>
+          </tr>
+        `;
+      });
+    }
+  }
+
+  function renderQualityCharts(logs) {
+    const paretoCanvas = document.getElementById('qualityParetoChart');
+    if (paretoCanvas) {
+      const reasonMap = new Map();
+      logs.forEach(q => {
+        const rReason = q.rework_reason || q.reason;
+        const jReason = q.rejection_reason || q.reason;
+        if (rReason && q.rework_qty > 0) reasonMap.set(rReason, (reasonMap.get(rReason) || 0) + parseNum(q.rework_qty));
+        if (jReason && q.rejection_qty > 0) reasonMap.set(jReason, (reasonMap.get(jReason) || 0) + parseNum(q.rejection_qty));
+      });
+
+      const sortedReasons = Array.from(reasonMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const labels = sortedReasons.map(r => r[0]);
+      const data = sortedReasons.map(r => r[1]);
+
+      if (charts.qualityPareto) charts.qualityPareto.destroy();
+
+      charts.qualityPareto = new Chart(paretoCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels.length ? labels : ['No Defect Data'],
+          datasets: [{
+            label: 'Defect / Defective Pcs',
+            data: data.length ? data : [0],
+            backgroundColor: 'rgba(217, 119, 6, 0.75)',
+            borderColor: '#d97706',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    const trendCanvas = document.getElementById('monthlyQualityTrendChart');
+    if (trendCanvas) {
+      const monthMap = new Map();
+      logs.forEach(q => {
+        if (!q.date || q.date.length < 7) return;
+        const m = q.date.substring(0, 7);
+        if (!monthMap.has(m)) monthMap.set(m, { rework: 0, rejection: 0 });
+        const item = monthMap.get(m);
+        item.rework += parseNum(q.rework_qty);
+        item.rejection += parseNum(q.rejection_qty);
+      });
+
+      const sortedMonths = Array.from(monthMap.keys()).sort();
+      const reworkData = sortedMonths.map(m => monthMap.get(m).rework);
+      const rejectionData = sortedMonths.map(m => monthMap.get(m).rejection);
+
+      if (charts.monthlyQuality) charts.monthlyQuality.destroy();
+
+      charts.monthlyQuality = new Chart(trendCanvas, {
+        type: 'line',
+        data: {
+          labels: sortedMonths.length ? sortedMonths : ['No Trend Data'],
+          datasets: [
+            {
+              label: 'Rework Pcs',
+              data: reworkData.length ? reworkData : [0],
+              borderColor: '#d97706',
+              backgroundColor: 'rgba(217, 119, 6, 0.1)',
+              tension: 0.3
+            },
+            {
+              label: 'Rejection Pcs',
+              data: rejectionData.length ? rejectionData : [0],
+              borderColor: '#dc2626',
+              backgroundColor: 'rgba(220, 38, 38, 0.1)',
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+    }
+  }
+
+  function renderTopQualityReasons(logs) {
+    const rewBody = document.getElementById('qmTopReworkReasonsBody');
+    const rejBody = document.getElementById('qmTopRejectionReasonsBody');
+
+    if (!rewBody || !rejBody) return;
+    rewBody.innerHTML = '';
+    rejBody.innerHTML = '';
+
+    const rewMap = new Map();
+    const rejMap = new Map();
+    let totalRew = 0;
+    let totalRej = 0;
+
+    logs.forEach(q => {
+      const rReason = q.rework_reason || q.reason;
+      const jReason = q.rejection_reason || q.reason;
+      const rewQty = parseNum(q.rework_qty);
+      const rejQty = parseNum(q.rejection_qty);
+
+      if (rReason && rewQty > 0) {
+        rewMap.set(rReason, (rewMap.get(rReason) || 0) + rewQty);
+        totalRew += rewQty;
+      }
+      if (jReason && rejQty > 0) {
+        rejMap.set(jReason, (rejMap.get(jReason) || 0) + rejQty);
+        totalRej += rejQty;
+      }
+    });
+
+    const topRew = Array.from(rewMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const topRej = Array.from(rejMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+    if (topRew.length === 0) {
+      rewBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 14px;">No rework defect data available.</td></tr>`;
+    } else {
+      topRew.forEach(([reason, qty], idx) => {
+        const share = totalRew > 0 ? ((qty / totalRew) * 100).toFixed(1) : '0.0';
+        rewBody.innerHTML += `
+          <tr>
+            <td><strong>#${idx + 1}</strong></td>
+            <td>${reason}</td>
+            <td><strong class="text-warning">${qty}</strong></td>
+            <td>${share}%</td>
+          </tr>
+        `;
+      });
+    }
+
+    if (topRej.length === 0) {
+      rejBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 14px;">No rejection defect data available.</td></tr>`;
+    } else {
+      topRej.forEach(([reason, qty], idx) => {
+        const share = totalRej > 0 ? ((qty / totalRej) * 100).toFixed(1) : '0.0';
+        rejBody.innerHTML += `
+          <tr>
+            <td><strong>#${idx + 1}</strong></td>
+            <td>${reason}</td>
+            <td><strong class="text-danger">${qty}</strong></td>
+            <td>${share}%</td>
+          </tr>
+        `;
+      });
+    }
   }
 
   function updateHammerLogCountBadges() {
@@ -2193,39 +2820,76 @@
     return parsed;
   }
 
+  let excelValidNewRecords = [];
+
   function renderExcelPreview(records, hammerNameOverride) {
     const card = document.getElementById('excelPreviewCard');
     const table = document.getElementById('excelPreviewTable');
-    document.getElementById('excelRecordCount').textContent = records.length;
     document.getElementById('excelPreviewTargetLabel').textContent = hammerNameOverride || 'Combined Fleet Sheet';
 
     card.style.display = 'block';
+
+    let newCount = 0;
+    let duplicateCount = 0;
+    let errorCount = 0;
+
+    excelValidNewRecords = [];
+
+    const existingKeys = new Set(shiftLogs.map(l => `${l.date}_${l.shift}_${l.machine}_${l.partNumber}`));
+
+    records.forEach(r => {
+      const key = `${r.date}_${r.shift}_${r.machine}_${r.partNumber}`;
+      if (!r.date || !r.partNumber || r.totalParts < 0) {
+        errorCount++;
+      } else if (existingKeys.has(key)) {
+        duplicateCount++;
+      } else {
+        newCount++;
+        excelValidNewRecords.push(r);
+      }
+    });
+
+    const newEl = document.getElementById('catNewRecordsCount');
+    const dupEl = document.getElementById('catDuplicateRecordsCount');
+    const errEl = document.getElementById('catErrorRecordsCount');
+
+    if (newEl) newEl.textContent = newCount;
+    if (dupEl) dupEl.textContent = duplicateCount;
+    if (errEl) errEl.textContent = errorCount;
 
     const thead = table.querySelector('thead');
     const tbody = table.querySelector('tbody');
 
     thead.innerHTML = `
       <tr>
+        <th>Validation Status</th>
         <th>Date</th>
         <th>Shift</th>
         <th>Machine</th>
         <th>Part Number</th>
-        <th>Net Planned</th>
-        <th>Downtime</th>
+        <th>Planned Mins</th>
+        <th>Downtime Mins</th>
         <th>Total Parts</th>
         <th>Good</th>
         <th>Rejects</th>
-        <th>Avail %</th>
-        <th>Perf %</th>
-        <th>Qual %</th>
         <th>OEE %</th>
       </tr>
     `;
 
     tbody.innerHTML = '';
-    records.slice(0, 10).forEach(r => {
+    records.slice(0, 15).forEach(r => {
+      const key = `${r.date}_${r.shift}_${r.machine}_${r.partNumber}`;
+      let statusBadge = '<span class="badge badge-success"><i class="fa-solid fa-check"></i> New Valid</span>';
+
+      if (!r.date || !r.partNumber) {
+        statusBadge = '<span class="badge badge-danger"><i class="fa-solid fa-xmark"></i> Invalid</span>';
+      } else if (existingKeys.has(key)) {
+        statusBadge = '<span class="badge badge-warning"><i class="fa-solid fa-copy"></i> Duplicate</span>';
+      }
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
+        <td>${statusBadge}</td>
         <td>${r.date}</td>
         <td>${r.shift}</td>
         <td>${r.machine}</td>
@@ -2235,13 +2899,65 @@
         <td>${r.totalParts}</td>
         <td>${r.goodParts}</td>
         <td>${r.rejects}</td>
-        <td>${r.availability}%</td>
-        <td>${r.performance}%</td>
-        <td>${r.quality}%</td>
         <td><strong style="color: ${getOeeColor(r.oee)}; font-weight: bold; font-size: 14px;">${r.oee}%</strong></td>
       `;
       tbody.appendChild(tr);
     });
+  }
+
+  async function commitExcelImportToSupabase() {
+    if (excelValidNewRecords.length === 0) {
+      showToast('No new valid records to import.', 'warning');
+      return;
+    }
+
+    const userId = currentAuthUser ? currentAuthUser.id : null;
+
+    if (supabaseClient) {
+      try {
+        const prodRows = excelValidNewRecords.map(r => ({
+          date: r.date,
+          shift: r.shift,
+          hammer: r.machine,
+          part_number: r.partNumber,
+          planned_time_mins: r.plannedTimeMins,
+          planned_qty: r.totalParts,
+          production_qty: r.totalParts,
+          good_qty: r.goodParts,
+          created_by: userId
+        }));
+
+        const { error: prodErr } = await supabaseClient.from('production_data').insert(prodRows);
+        if (prodErr) throw prodErr;
+
+        const qualRows = excelValidNewRecords.map(r => ({
+          date: r.date,
+          shift: r.shift,
+          hammer: r.machine,
+          part_number: r.partNumber,
+          inspection_stage: 'In-Process',
+          inspection_qty: r.totalParts,
+          rework_qty: r.rework || 0,
+          rejection_qty: r.rejects,
+          created_by: userId
+        }));
+
+        await supabaseClient.from('quality_data').insert(qualRows);
+
+        showToast(`Successfully inserted ${excelValidNewRecords.length} records into Supabase!`, 'success');
+        document.getElementById('excelPreviewCard').style.display = 'none';
+        fetchSupabaseShiftLogs();
+      } catch (err) {
+        console.error('Excel Import Supabase Error:', err);
+        showToast(`Import Error: ${err.message}`, 'danger');
+      }
+    } else {
+      shiftLogs = mergeLogArrays(shiftLogs, excelValidNewRecords);
+      saveShiftLogs();
+      renderAllViews();
+      document.getElementById('excelPreviewCard').style.display = 'none';
+      showToast(`Imported ${excelValidNewRecords.length} records locally.`, 'success');
+    }
   }
 
   function downloadHammerSpecificTemplate(hammerName) {
@@ -2648,6 +3364,226 @@
         if (input && input.value) {
           window.open(input.value, '_blank');
         }
+      });
+    }
+
+    // Supabase Auth Modal listeners
+    const openAuthBtn = document.getElementById('openAuthModalBtn');
+    const closeAuthBtn = document.getElementById('closeAuthModalBtn');
+    const authModal = document.getElementById('supabaseAuthModal');
+    const authForm = document.getElementById('supabaseAuthForm');
+    const tabLogin = document.getElementById('authTabLogin');
+    const tabSignup = document.getElementById('authTabSignup');
+    const signupFields = document.getElementById('signupFieldsContainer');
+    const logoutBtn = document.getElementById('logoutBtn');
+    let isSignupMode = false;
+
+    if (openAuthBtn) openAuthBtn.addEventListener('click', () => authModal.style.display = 'flex');
+    if (closeAuthBtn) closeAuthBtn.addEventListener('click', () => authModal.style.display = 'none');
+    if (logoutBtn) logoutBtn.addEventListener('click', () => {
+      if (supabaseClient) supabaseClient.auth.signOut().then(() => handleUserLoggedOut());
+    });
+
+    if (tabLogin && tabSignup) {
+      tabLogin.addEventListener('click', (e) => {
+        e.preventDefault();
+        isSignupMode = false;
+        tabLogin.style.borderBottom = '2px solid var(--primary)';
+        tabSignup.style.borderBottom = 'none';
+        signupFields.style.display = 'none';
+        document.getElementById('authSubmitBtn').innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In to Supabase';
+      });
+
+      tabSignup.addEventListener('click', (e) => {
+        e.preventDefault();
+        isSignupMode = true;
+        tabSignup.style.borderBottom = '2px solid var(--primary)';
+        tabLogin.style.borderBottom = 'none';
+        signupFields.style.display = 'block';
+        document.getElementById('authSubmitBtn').innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Supabase Account';
+      });
+    }
+
+    if (authForm) {
+      authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!supabaseClient) {
+          showToast('Please configure Supabase connection first!', 'warning');
+          document.getElementById('supabaseConfigModal').style.display = 'flex';
+          return;
+        }
+
+        const email = document.getElementById('authEmailInput').value.trim();
+        const password = document.getElementById('authPasswordInput').value.trim();
+
+        if (isSignupMode) {
+          const empName = document.getElementById('authEmpNameInput').value.trim() || email.split('@')[0];
+          const dept = document.getElementById('authDeptSelect').value;
+          const role = document.getElementById('authRoleSelect').value;
+
+          const { error } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { employee_name: empName, department: dept, role: role } }
+          });
+
+          if (error) {
+            showToast(`Auth Error: ${error.message}`, 'danger');
+          } else {
+            showToast('Account created successfully!', 'success');
+            authModal.style.display = 'none';
+          }
+        } else {
+          const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (error) {
+            showToast(`Login Error: ${error.message}`, 'danger');
+          } else {
+            showToast('Signed in successfully!', 'success');
+            authModal.style.display = 'none';
+          }
+        }
+      });
+    }
+
+    // Config Modal Listeners
+    const openCfgBtn = document.getElementById('openConfigModalBtn');
+    const closeCfgBtn = document.getElementById('closeConfigModalBtn');
+    const cfgModal = document.getElementById('supabaseConfigModal');
+    const saveCfgBtn = document.getElementById('saveSupabaseConfigBtn');
+
+    if (openCfgBtn) openCfgBtn.addEventListener('click', () => cfgModal.style.display = 'flex');
+    if (closeCfgBtn) closeCfgBtn.addEventListener('click', () => cfgModal.style.display = 'none');
+
+    if (saveCfgBtn) {
+      saveCfgBtn.addEventListener('click', () => {
+        const url = document.getElementById('cfgSupabaseUrl').value.trim();
+        const key = document.getElementById('cfgSupabaseKey').value.trim();
+        if (url && key) {
+          localStorage.setItem('supabase_url', url);
+          localStorage.setItem('supabase_key', key);
+          initSupabaseClient();
+          cfgModal.style.display = 'none';
+          showToast('Supabase connection settings saved!', 'success');
+        } else {
+          showToast('Please enter both Supabase URL and Anon Key.', 'warning');
+        }
+      });
+    }
+
+    // Quality Activity Monitor Filter listeners
+    ['qmMonthFilter', 'qmStageFilter', 'qmPartFilter', 'qmReasonFilter'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', renderQualityActivityMonitor);
+    });
+
+    const qmResetBtn = document.getElementById('qmResetFiltersBtn');
+    if (qmResetBtn) {
+      qmResetBtn.addEventListener('click', () => {
+        document.getElementById('qmMonthFilter').value = 'ALL';
+        document.getElementById('qmStageFilter').value = 'ALL';
+        document.getElementById('qmPartFilter').value = 'ALL';
+        document.getElementById('qmReasonFilter').value = 'ALL';
+        renderQualityActivityMonitor();
+      });
+    }
+
+    // Manual Entry Form Submit Handler for Supabase
+    const entryForm = document.getElementById('manualEntryForm');
+    if (entryForm) {
+      entryForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const date = document.getElementById('entryDate').value;
+        const shift = document.getElementById('entryShift').value;
+        const hammer = document.getElementById('entryHammer').value;
+        const partNumber = document.getElementById('entryPartNumber').value.trim();
+        const plannedTimeMins = parseNum(document.getElementById('entryPlannedTime').value, 660);
+        const maintanceMins = parseNum(document.getElementById('entryMaintance').value);
+        const dieRelatedMins = parseNum(document.getElementById('entryDieRelated').value);
+        const setupMins = parseNum(document.getElementById('entrySetup').value);
+        const noManpowerMins = parseNum(document.getElementById('entryNoManpower').value);
+        const heatingTimeMins = parseNum(document.getElementById('entryHeatingTime').value);
+        const minorStopMins = parseNum(document.getElementById('entryMinorStop').value);
+        const totalParts = parseNum(document.getElementById('entryTotalParts').value);
+        const rejects = parseNum(document.getElementById('entryRejects').value);
+        const goodParts = Math.max(0, totalParts - rejects);
+        const stage = document.getElementById('entryInspectionStage').value;
+        const reworkQty = parseNum(document.getElementById('entryReworkQty').value);
+        const reworkReason = document.getElementById('entryReworkReason').value.trim();
+        const rejectionReason = document.getElementById('entryRejectionReason').value.trim();
+
+        if (!date || !partNumber) {
+          showToast('Please fill in Date and Part Number.', 'warning');
+          return;
+        }
+
+        const userId = currentAuthUser ? currentAuthUser.id : null;
+
+        if (supabaseClient) {
+          try {
+            const { error: prodErr } = await supabaseClient.from('production_data').insert([{
+              date, shift, hammer, part_number: partNumber, planned_time_mins: plannedTimeMins,
+              planned_qty: totalParts, production_qty: totalParts, good_qty: goodParts,
+              created_by: userId
+            }]);
+            if (prodErr) throw prodErr;
+
+            const { error: qualErr } = await supabaseClient.from('quality_data').insert([{
+              date, shift, hammer, part_number: partNumber, inspection_stage: stage,
+              inspection_qty: totalParts, rework_qty: reworkQty, rejection_qty: rejects,
+              rework_reason: reworkReason, rejection_reason: rejectionReason,
+              created_by: userId
+            }]);
+            if (qualErr) throw qualErr;
+
+            const downtimes = [
+              { category: 'Maintenance', mins: maintanceMins },
+              { category: 'Die Related', mins: dieRelatedMins },
+              { category: 'Setup', mins: setupMins },
+              { category: 'No Manpower', mins: noManpowerMins },
+              { category: 'Heating Time', mins: heatingTimeMins },
+              { category: 'Minor Stop', mins: minorStopMins }
+            ].filter(d => d.mins > 0);
+
+            if (downtimes.length > 0) {
+              const downRows = downtimes.map(d => ({
+                date, shift, hammer, part_number: partNumber,
+                downtime_category: d.category, downtime_minutes: d.mins,
+                created_by: userId
+              }));
+              await supabaseClient.from('downtime_data').insert(downRows);
+            }
+
+            showToast('Saved directly to Supabase Cloud Database!', 'success');
+            fetchSupabaseShiftLogs();
+          } catch (err) {
+            console.error('Supabase Save Error:', err);
+            showToast(`Save Error: ${err.message}`, 'danger');
+          }
+        } else {
+          const record = calculateOeeRecord({
+            id: 'log_' + Date.now(), date, shift, machine: hammer, partNumber, plannedTimeMins,
+            maintanceMins, dieRelatedMins, setupMins, noManpowerMins, heatingTimeMins, minorStopMins,
+            totalParts, goodParts, rejects, rework: reworkQty, idealCycleSec: 45
+          });
+          shiftLogs.push(record);
+          saveShiftLogs();
+          renderAllViews();
+          showToast('Shift Record Saved Locally.', 'success');
+        }
+      });
+    }
+
+    const commitExcelBtn = document.getElementById('commitExcelImportBtn');
+    if (commitExcelBtn) {
+      commitExcelBtn.addEventListener('click', commitExcelImportToSupabase);
+    }
+
+    const cancelExcelBtn = document.getElementById('cancelExcelImportBtn');
+    if (cancelExcelBtn) {
+      cancelExcelBtn.addEventListener('click', () => {
+        document.getElementById('excelPreviewCard').style.display = 'none';
+        showToast('Excel import cancelled.', 'info');
       });
     }
 

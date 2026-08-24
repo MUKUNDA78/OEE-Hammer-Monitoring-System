@@ -1385,3 +1385,190 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   SUPABASE AUTH, PRESENCE, & QUALITY ACTIVITY MONITOR EXTENSIONS
+   ========================================================================== */
+
+/* User Profile Badge */
+.user-profile-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 4px 12px 4px 6px;
+  border-radius: 20px;
+  font-size: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #16a34a, #0284c7);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.user-name {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.user-role-dept {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Presence Popover Badge */
+.presence-pill {
+  position: relative;
+  cursor: pointer;
+}
+
+.presence-popover {
+  display: none;
+  position: absolute;
+  top: 110%;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  width: 240px;
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  font-size: 12px;
+}
+
+.presence-pill:hover .presence-popover {
+  display: block;
+}
+
+.presence-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.presence-user-row:last-child {
+  border-bottom: none;
+}
+
+/* Quality Activity Monitor Section */
+.quality-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.qm-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  box-shadow: var(--shadow-sm);
+}
+
+.qm-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qm-filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.qm-filter-group select {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color-light);
+  background: var(--bg-main);
+  color: var(--text-main);
+  outline: none;
+}
+
+.qm-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.qm-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.qm-stat-icon.rework { background: rgba(217, 119, 6, 0.12); color: #d97706; }
+.qm-stat-icon.rejection { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+.qm-stat-icon.inspection { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+
+/* Excel Categorization Preview Cards */
+.excel-categorization-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.cat-card {
+  border-radius: var(--radius-md);
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.cat-card.new-records { background: rgba(22, 163, 74, 0.08); border-color: #16a34a; }
+.cat-card.duplicate-records { background: rgba(217, 119, 6, 0.08); border-color: #d97706; }
+.cat-card.error-records { background: rgba(220, 38, 38, 0.08); border-color: #dc2626; }
+
+.cat-num {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 4px;
+}
+.cat-card.new-records .cat-num { color: #16a34a; }
+.cat-card.duplicate-records .cat-num { color: #d97706; }
+.cat-card.error-records .cat-num { color: #dc2626; }
+
+@media (max-width: 768px) {
+  .excel-categorization-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -21,9 +21,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase Realtime Database for Instant Multi-User Live Sync -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- Supabase JS Client for Cloud Database, Auth, Realtime & RLS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Application CSS -->
   <link rel="stylesheet" href="styles.css?v=20260808">
@@ -64,14 +63,40 @@
         <div class="status-pill active" title="3.5 Ton Hammer Status">
           <span class="dot"></span> 3.5 Ton
         </div>
-        <div class="status-pill active" id="cloudDbStatusPill" style="background: rgba(22, 163, 74, 0.15); border: 1px solid var(--primary); color: var(--primary);" title="Multi-User Online Cloud Database Sync">
-          <span class="dot"></span> <i class="fa-solid fa-database"></i> Cloud DB: Ready
+        
+        <!-- Supabase Realtime DB Connection Status -->
+        <div class="status-pill active" id="cloudDbStatusPill" style="background: rgba(22, 163, 74, 0.15); border: 1px solid var(--primary); color: var(--primary);" title="Multi-User Supabase Cloud Database Status">
+          <span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live Database Connected
+        </div>
+
+        <!-- Realtime Presence Indicator -->
+        <div class="status-pill active presence-pill" id="presenceStatusPill" title="Users Online in Realtime">
+          <span class="dot"></span> <i class="fa-solid fa-users"></i> <span id="presenceCount">1 User Online</span>
+          <div class="presence-popover" id="presencePopover">
+            <div style="font-weight: 700; margin-bottom: 6px; color: var(--primary);">🟢 Active Online Users</div>
+            <div id="presenceUserList">
+              <div class="presence-user-row"><span>You (Current Session)</span><span class="badge badge-success">Online</span></div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="header-actions">
-        <button class="btn btn-warning btn-sm" id="restoreBackupLogsBtn" title="Recover missing shift logs from browser backups">
-          <i class="fa-solid fa-life-ring"></i> Recover Data
+        <!-- User Profile Badge & Logout -->
+        <div class="user-profile-badge" id="userProfileBadge" style="display: none;">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <div class="user-details">
+            <span class="user-name" id="userEmpName">User</span>
+            <span class="user-role-dept" id="userRoleDept">Role | Dept</span>
+          </div>
+          <button class="btn btn-icon btn-sm" id="logoutBtn" title="Logout" style="margin-left: 4px;"><i class="fa-solid fa-right-from-bracket text-danger"></i></button>
+        </div>
+
+        <button class="btn btn-primary btn-sm" id="openAuthModalBtn"><i class="fa-solid fa-lock"></i> Login / Register</button>
+        <button class="btn btn-outline btn-sm" id="openConfigModalBtn" title="Supabase Cloud Connection Settings"><i class="fa-solid fa-plug"></i> DB Config</button>
+
+        <button class="btn btn-warning btn-sm" id="restoreBackupLogsBtn" title="Migrate existing local logs into Supabase">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Migrate to Supabase
         </button>
         <button class="btn btn-outline btn-sm" id="cloudDbSyncBtn" title="Sync Online Database Across Systems">
           <i class="fa-solid fa-cloud-arrow-down"></i> Sync Online DB
@@ -99,6 +124,9 @@
       <div class="nav-tabs">
         <button class="nav-tab active" data-tab="overview">
           <i class="fa-solid fa-gauge-high"></i> Dashboard Overview
+        </button>
+        <button class="nav-tab" data-tab="quality-monitor">
+          <i class="fa-solid fa-microscope"></i> Quality Activity Monitor
         </button>
         <button class="nav-tab" data-tab="insights">
           <i class="fa-solid fa-magnifying-glass-chart"></i> Part & Machine Insights
@@ -362,6 +390,228 @@
             </table>
           </div>
         </div>
+      </section>
+
+      <!-- TAB: QUALITY ACTIVITY MONITOR -->
+      <section class="tab-content" id="tab-quality-monitor">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-microscope text-primary"></i> Quality Activity Monitor & Defect Analytics</h2>
+          <p>Real-time inspection stage tracking (In-Process, Final Inspection, MPI), separate Rework vs Rejection analysis, and defect Pareto charts</p>
+        </div>
+        
+        <!-- Quality Filter Bar -->
+        <div class="qm-filter-bar">
+          <div class="qm-filter-group">
+            <label><i class="fa-solid fa-calendar-days text-primary"></i> Month:</label>
+            <select id="qmMonthFilter">
+              <option value="ALL">All Months</option>
+            </select>
+          </div>
+
+          <div class="qm-filter-group">
+            <label><i class="fa-solid fa-filter text-info"></i> Inspection Stage:</label>
+            <select id="qmStageFilter">
+              <option value="ALL">All Stages (In-Process, Final, MPI)</option>
+              <option value="In-Process">In-Process</option>
+              <option value="Final Inspection">Final Inspection</option>
+              <option value="MPI">MPI</option>
+            </select>
+          </div>
+
+          <div class="qm-filter-group">
+            <label><i class="fa-solid fa-gear text-warning"></i> Part Number:</label>
+            <select id="qmPartFilter">
+              <option value="ALL">All Part Numbers</option>
+            </select>
+          </div>
+
+          <div class="qm-filter-group">
+            <label><i class="fa-solid fa-triangle-exclamation text-danger"></i> Reason / Defect:</label>
+            <select id="qmReasonFilter">
+              <option value="ALL">All Defect Reasons</option>
+            </select>
+          </div>
+
+          <button class="btn btn-outline btn-sm" id="qmResetFiltersBtn">
+            <i class="fa-solid fa-rotate-left"></i> Reset Quality Filters
+          </button>
+        </div>
+
+        <!-- Quality KPI Stat Cards -->
+        <div class="metrics-grid">
+          <div class="metric-card info">
+            <div class="metric-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <div class="metric-info">
+              <span class="metric-title">Total Inspected Qty</span>
+              <div class="metric-value" id="qmTotalInspected">0 pcs</div>
+              <span class="metric-subtitle">Inspected across filters</span>
+            </div>
+          </div>
+
+          <div class="metric-card warning">
+            <div class="metric-icon"><i class="fa-solid fa-wrench"></i></div>
+            <div class="metric-info">
+              <span class="metric-title">Total Rework Qty</span>
+              <div class="metric-value" id="qmTotalRework">0 pcs</div>
+              <span class="metric-subtitle" id="qmReworkPct">Rework: 0.0%</span>
+            </div>
+          </div>
+
+          <div class="metric-card danger">
+            <div class="metric-icon"><i class="fa-solid fa-ban"></i></div>
+            <div class="metric-info">
+              <span class="metric-title">Total Rejection Qty</span>
+              <div class="metric-value" id="qmTotalRejection">0 pcs</div>
+              <span class="metric-subtitle" id="qmRejectionPct">Rejection: 0.0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quality Activity Records Table -->
+        <div class="card mt-3">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3><i class="fa-solid fa-list-check text-primary"></i> Inspection & Quality Activity Log</h3>
+            <span class="badge badge-info" id="qmRecordCountBadge">0 Records</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Shift</th>
+                  <th>Hammer</th>
+                  <th>Part Number</th>
+                  <th>Stage</th>
+                  <th>Inspected</th>
+                  <th>Rework Qty</th>
+                  <th>Rework %</th>
+                  <th>Rejection Qty</th>
+                  <th>Rejection %</th>
+                  <th>Rework Reason</th>
+                  <th>Rejection Reason</th>
+                  <th>User / Created By</th>
+                </tr>
+              </thead>
+              <tbody id="qmTableBody">
+                <tr><td colspan="13" style="text-align: center; color: var(--text-muted); padding: 20px;">Select filters or log quality inspection data to view activity.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Part-Wise Rework & Rejection Breakdown -->
+        <div class="grid-2-col mt-3">
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-wrench text-warning"></i> Part-Wise Rework Analysis</h3>
+            </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Part Number</th>
+                    <th>Inspected</th>
+                    <th>Rework Qty</th>
+                    <th>Rework %</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="qmPartReworkTableBody">
+                  <tr><td colspan="5" style="text-align: center; padding: 16px;">No rework data found.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-ban text-danger"></i> Part-Wise Rejection Analysis</h3>
+            </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Part Number</th>
+                    <th>Inspected</th>
+                    <th>Rejection Qty</th>
+                    <th>Rejection %</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="qmPartRejectionTableBody">
+                  <tr><td colspan="5" style="text-align: center; padding: 16px;">No rejection data found.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reason-Wise Pareto & Monthly Trends -->
+        <div class="grid-2-col mt-3">
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-chart-line text-primary"></i> Reason-Wise Quality Pareto (Rework & Rejection)</h3>
+            </div>
+            <div class="chart-container" style="height: 320px;">
+              <canvas id="qualityParetoChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-arrow-trend-up text-warning"></i> Monthly Rework & Rejection Trends</h3>
+            </div>
+            <div class="chart-container" style="height: 320px;">
+              <canvas id="monthlyQualityTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top 10 Rework Reasons & Top 10 Rejection Reasons -->
+        <div class="grid-2-col mt-3">
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-triangle-exclamation text-warning"></i> Top 10 Rework Reasons</h3>
+            </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th># Rank</th>
+                    <th>Defect / Reason</th>
+                    <th>Rework Qty</th>
+                    <th>Share %</th>
+                  </tr>
+                </thead>
+                <tbody id="qmTopReworkReasonsBody">
+                  <tr><td colspan="4" style="text-align: center; padding: 14px;">No rework defect data available.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-circle-xmark text-danger"></i> Top 10 Rejection Reasons</h3>
+            </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th># Rank</th>
+                    <th>Defect / Reason</th>
+                    <th>Rejection Qty</th>
+                    <th>Share %</th>
+                  </tr>
+                </thead>
+                <tbody id="qmTopRejectionReasonsBody">
+                  <tr><td colspan="4" style="text-align: center; padding: 14px;">No rejection defect data available.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </section>
 
       <!-- TAB 2: PART & MACHINE INSIGHTS -->
@@ -793,6 +1043,34 @@
                 </div>
               </div>
 
+              <!-- Section 4: Quality Inspection & Rework/Rejection Breakdown -->
+              <h4 class="form-section-title mt-3"><i class="fa-solid fa-microscope text-primary"></i> 4. Quality Inspection & Rework / Rejection Breakdown</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="entryInspectionStage">Inspection Stage <span class="required">*</span></label>
+                  <select id="entryInspectionStage">
+                    <option value="In-Process" selected>In-Process</option>
+                    <option value="Final Inspection">Final Inspection</option>
+                    <option value="MPI">MPI</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="entryReworkQty">Rework Qty (pcs)</label>
+                  <input type="number" id="entryReworkQty" min="0" value="0" placeholder="Reworkable parts">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryReworkReason">Rework Defect / Reason</label>
+                  <input type="text" id="entryReworkReason" placeholder="e.g. Dimensions Over, Flash Excess">
+                </div>
+
+                <div class="form-group">
+                  <label for="entryRejectionReason">Rejection Defect / Reason</label>
+                  <input type="text" id="entryRejectionReason" placeholder="e.g. Underfill, Crack, Scale Mark">
+                </div>
+              </div>
+
               <!-- Live OEE Calculation Preview -->
               <div class="oee-live-calculator mt-3">
                 <h4><i class="fa-solid fa-calculator"></i> Real-Time Computed OEE Results (Base: Net 660m = 11 Hours)</h4>
@@ -1097,17 +1375,39 @@
 
         <!-- Excel Data Preview Table Container -->
         <div class="card mt-4" id="excelPreviewCard" style="display: none;">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-eye"></i> Excel Import Preview (<span id="excelPreviewTargetLabel">Combined</span> - <span id="excelRecordCount">0</span> records)</h3>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h3><i class="fa-solid fa-eye text-primary"></i> Excel Import Validation & Categorization Preview (<span id="excelPreviewTargetLabel">Combined</span>)</h3>
             <div class="card-actions">
-              <button class="btn btn-success btn-sm" id="commitExcelImportBtn">
-                <i class="fa-solid fa-check-double"></i> Confirm & Import Records
+              <button class="btn btn-success" id="commitExcelImportBtn">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Confirm & Insert Valid Records into Supabase
               </button>
               <button class="btn btn-secondary btn-sm" id="cancelExcelImportBtn">
                 <i class="fa-solid fa-xmark"></i> Cancel
               </button>
             </div>
           </div>
+
+          <!-- Excel Import Categorization Breakdown Cards -->
+          <div class="excel-categorization-grid" id="excelCategorizationGrid">
+            <div class="cat-card new-records">
+              <div style="font-weight: 700; font-size: 12px;"><i class="fa-solid fa-circle-plus"></i> New Valid Records</div>
+              <div class="cat-num" id="catNewRecordsCount">0</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Will be inserted to Supabase</div>
+            </div>
+
+            <div class="cat-card duplicate-records">
+              <div style="font-weight: 700; font-size: 12px;"><i class="fa-solid fa-copy"></i> Duplicate Records</div>
+              <div class="cat-num" id="catDuplicateRecordsCount">0</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Already in DB (No Overwrite)</div>
+            </div>
+
+            <div class="cat-card error-records">
+              <div style="font-weight: 700; font-size: 12px;"><i class="fa-solid fa-triangle-exclamation"></i> Error / Invalid</div>
+              <div class="cat-num" id="catErrorRecordsCount">0</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Invalid fields / numbers</div>
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="data-table" id="excelPreviewTable">
               <thead>
@@ -1230,6 +1530,99 @@
 
         <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('mobileQrModalBackdrop').style.display='none'">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase Authentication Modal (Login / Register) -->
+  <div class="modal-backdrop" id="supabaseAuthModal" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 99999;">
+    <div class="card" style="max-width: 440px; width: 92%; background: var(--bg-card); padding: 24px; border-radius: 12px; position: relative;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+        <h3 style="font-size: 17px; color: var(--primary); margin: 0;"><i class="fa-solid fa-user-lock"></i> GRS Enterprise Auth</h3>
+        <button class="btn btn-icon btn-sm" id="closeAuthModalBtn"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Auth Tab Selector -->
+      <div style="display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+        <button id="authTabLogin" class="btn btn-sm" style="flex: 1; border-radius: 0; border-bottom: 2px solid var(--primary); font-weight: 700;">Sign In</button>
+        <button id="authTabSignup" class="btn btn-sm" style="flex: 1; border-radius: 0; font-weight: 700; color: var(--text-muted);">Create Account</button>
+      </div>
+
+      <form id="supabaseAuthForm">
+        <div class="form-group mb-3">
+          <label><i class="fa-solid fa-envelope text-primary"></i> Company Email:</label>
+          <input type="email" id="authEmailInput" required placeholder="user@company.com" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+        </div>
+
+        <div class="form-group mb-3">
+          <label><i class="fa-solid fa-key text-primary"></i> Password:</label>
+          <input type="password" id="authPasswordInput" required placeholder="••••••••" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+        </div>
+
+        <!-- Registration Fields (hidden during Sign In) -->
+        <div id="signupFieldsContainer" style="display: none;">
+          <div class="form-group mb-3">
+            <label><i class="fa-solid fa-id-card text-info"></i> Employee Full Name:</label>
+            <input type="text" id="authEmpNameInput" placeholder="John Doe" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+          </div>
+
+          <div class="form-group mb-3">
+            <label><i class="fa-solid fa-building text-warning"></i> Department:</label>
+            <select id="authDeptSelect" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+              <option value="Production">Production</option>
+              <option value="Quality">Quality</option>
+              <option value="Maintenance">Maintenance</option>
+              <option value="Management">Management</option>
+              <option value="Administration">Administration</option>
+            </select>
+          </div>
+
+          <div class="form-group mb-3">
+            <label><i class="fa-solid fa-user-shield text-danger"></i> System Role:</label>
+            <select id="authRoleSelect" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+              <option value="Production">Production (Add/Edit Production Records)</option>
+              <option value="Quality">Quality (Add/Edit Quality Records)</option>
+              <option value="Maintenance">Maintenance (Add/Edit Downtime Records)</option>
+              <option value="Management">Management (Read-Only All Dashboards)</option>
+              <option value="Viewer">Viewer (Read-Only Access)</option>
+              <option value="Admin">Admin (Full Access & User Management)</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="authSubmitBtn" style="width: 100%; padding: 10px; margin-top: 10px; font-weight: 700;">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In to Supabase
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Supabase DB Connection Settings Modal -->
+  <div class="modal-backdrop" id="supabaseConfigModal" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 99999;">
+    <div class="card" style="max-width: 500px; width: 92%; background: var(--bg-card); padding: 22px; border-radius: 12px; position: relative;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+        <h3 style="font-size: 16px; color: var(--primary); margin: 0;"><i class="fa-solid fa-plug text-success"></i> Supabase Cloud DB Connection Config</h3>
+        <button class="btn btn-icon btn-sm" id="closeConfigModalBtn"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+          Configure your central Supabase PostgreSQL URL and Anon Key. These can also be supplied via <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>.
+        </p>
+
+        <div class="form-group mb-3">
+          <label style="font-size: 12px; font-weight: 600;">Supabase Project URL:</label>
+          <input type="text" id="cfgSupabaseUrl" placeholder="https://xyz.supabase.co" style="width: 100%; font-size: 12px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+        </div>
+
+        <div class="form-group mb-3">
+          <label style="font-size: 12px; font-weight: 600;">Supabase Anon Key:</label>
+          <input type="text" id="cfgSupabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." style="width: 100%; font-size: 11px; font-family: monospace; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: var(--text-main);">
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 14px;">
+          <button class="btn btn-success" id="saveSupabaseConfigBtn" style="flex: 1;"><i class="fa-solid fa-floppy-disk"></i> Save & Connect</button>
+          <button class="btn btn-outline" id="testSupabaseConnectionBtn" style="flex: 1;"><i class="fa-solid fa-bolt"></i> Test Connection</button>
         </div>
       </div>
     </div>
