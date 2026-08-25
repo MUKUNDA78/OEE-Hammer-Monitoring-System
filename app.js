@@ -22,6 +22,12 @@
   let currentAuthUser = null;
   let presenceChannel = null;
 
+  // Public frontend Supabase configuration
+const SUPABASE_CONFIG = {
+  url: 'https://pydelymukfabbfhjcivg.supabase.co',
+  key: 'sb_publishable_s1cjWwmuh5oW--fw0iWdvQ_DahRdZvn'
+};
+
   // Target Equipment Specification
   const HAMMERS = [
     { name: '1 Ton Hammer', capacity: '1.0 Ton', color: '#2563eb', defaultCycle: 35, badgeId: 'countBadge_1Ton', samplePart: 'A1#21' },
@@ -569,10 +575,21 @@
      CENTRAL SUPABASE CLOUD DATABASE, AUTH, REALTIME & RLS ENGINE
      ========================================================================== */
   function getSupabaseCredentials() {
-    const url = window.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || '';
-    const key = window.VITE_SUPABASE_PUBLISHABLE_KEY || window.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_key') || '';
+    const url =
+        SUPABASE_CONFIG.url ||
+        window.VITE_SUPABASE_URL ||
+        localStorage.getItem('supabase_url') ||
+        '';
+
+    const key =
+        SUPABASE_CONFIG.key ||
+        window.VITE_SUPABASE_PUBLISHABLE_KEY ||
+        window.VITE_SUPABASE_ANON_KEY ||
+        localStorage.getItem('supabase_key') ||
+        '';
+
     return { url, key };
-  }
+}
 
   function initSupabaseClient() {
     const { url, key } = getSupabaseCredentials();
