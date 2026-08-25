@@ -1105,6 +1105,72 @@ if (shareBtn) {
     });
   }
 
+  /* ==========================================================================
+     SHIFT-LEVEL GROUPED KPI CALCULATION ENGINE (ELIMINATES PLANNED TIME DUPLICATION)
+     ========================================================================== */
+  function calculateFleetKpis(logs) {
+    if (!logs || logs.length === 0) {
+      return { totalShifts: 0, partEntries: 0, plannedMins: 0, operatingMins: 0, idealMins: 0, totalPcs: 0, goodPcs: 0, rejectPcs: 0, avail: 0, perf: 0, qual: 0, oee: 0 };
+    }
+
+    const shiftMap = new Map();
+    logs.forEach(l => {
+      const key = `${l.date}_${l.shift}_${l.machine}`;
+      if (!shiftMap.has(key)) {
+        shiftMap.set(key, {
+          plannedMins: parseNum(l.plannedTimeMins, 660),
+          maintanceMins: parseNum(l.maintanceMins),
+          dieRelatedMins: parseNum(l.dieRelatedMins),
+          setupMins: parseNum(l.setupMins),
+          noManpowerMins: parseNum(l.noManpowerMins),
+          heatingTimeMins: parseNum(l.heatingTimeMins),
+          minorStopMins: parseNum(l.minorStopMins),
+          parts: []
+        });
+      }
+      const sObj = shiftMap.get(key);
+      sObj.plannedMins = Math.max(sObj.plannedMins, parseNum(l.plannedTimeMins, 660));
+      sObj.parts.push(l);
+    });
+
+    let plannedMins = 0, operatingMins = 0, idealMins = 0, totalPcs = 0, goodPcs = 0;
+
+    shiftMap.forEach(s => {
+      const totalDowntime = s.maintanceMins + s.dieRelatedMins + s.setupMins + s.noManpowerMins + s.heatingTimeMins + s.minorStopMins;
+      const opMins = Math.max(0, s.plannedMins - totalDowntime);
+
+      plannedMins += s.plannedMins;
+      operatingMins += opMins;
+
+      s.parts.forEach(p => {
+        totalPcs += parseNum(p.totalParts);
+        goodPcs += parseNum(p.goodParts);
+        idealMins += (parseNum(p.totalParts) * parseNum(p.idealCycleSec, 45)) / 60;
+      });
+    });
+
+    const rejectPcs = totalPcs - goodPcs;
+    const avail = plannedMins > 0 ? (operatingMins / plannedMins) * 100 : 0;
+    const perf = operatingMins > 0 ? Math.min(100, (idealMins / operatingMins) * 100) : 0;
+    const qual = totalPcs > 0 ? (goodPcs / totalPcs) * 100 : 100;
+    const oee = (avail / 100) * (perf / 100) * (qual / 100) * 100;
+
+    return {
+      totalShifts: shiftMap.size,
+      partEntries: logs.length,
+      plannedMins,
+      operatingMins,
+      idealMins,
+      totalPcs,
+      goodPcs,
+      rejectPcs,
+      avail: parseFloat(avail.toFixed(1)),
+      perf: parseFloat(perf.toFixed(1)),
+      qual: parseFloat(qual.toFixed(1)),
+      oee: parseFloat(oee.toFixed(1))
+    };
+  }
+
   function updateDebugDiagnosticsPanel(filteredLogs) {
     const prodLoadEl = document.getElementById('dbgProdLoaded');
     const qualLoadEl = document.getElementById('dbgQualLoaded');
@@ -1223,38 +1289,23 @@ if (shareBtn) {
     if (prodCntEl) prodCntEl.textContent = rawProdLoadedCount;
     if (qualCntEl) qualCntEl.textContent = rawQualLoadedCount;
     if (downCntEl) downCntEl.textContent = rawDownLoadedCount;
-    if (matchedCntEl) matchedCntEl.textContent = filteredLogs.length;
+
+    const stats = calculateFleetKpis(filteredLogs);
+    if (matchedCntEl) matchedCntEl.textContent = `${filteredLogs.length} part entries (${stats.totalShifts} unique shifts)`;
 
     if (unProdEl) unProdEl.textContent = '0';
     if (unQualEl) unQualEl.textContent = '0';
     if (unDownEl) unDownEl.textContent = '0';
 
-    let totalPlannedMins = 0, totalOperatingMins = 0, totalIdealMins = 0, totalProduced = 0, totalGood = 0;
+    if (totPartsEl) totPartsEl.textContent = stats.totalPcs.toLocaleString() + ' pcs';
+    if (goodPartsEl) goodPartsEl.textContent = stats.goodPcs.toLocaleString() + ' pcs';
+    if (rejectPartsEl) rejectPartsEl.textContent = stats.rejectPcs.toLocaleString() + ' pcs';
 
-    filteredLogs.forEach(l => {
-      totalPlannedMins += parseNum(l.plannedTimeMins, 660);
-      totalOperatingMins += parseNum(l.operatingTimeMins);
-      totalIdealMins += Math.min(parseNum(l.operatingTimeMins), (parseNum(l.totalParts) * parseNum(l.idealCycleSec, 45)) / 60);
-      totalProduced += parseNum(l.totalParts);
-      totalGood += parseNum(l.goodParts);
-    });
-
-    const totalRejects = totalProduced - totalGood;
-
-    if (totPartsEl) totPartsEl.textContent = totalProduced.toLocaleString() + ' pcs';
-    if (goodPartsEl) goodPartsEl.textContent = totalGood.toLocaleString() + ' pcs';
-    if (rejectPartsEl) rejectPartsEl.textContent = totalRejects.toLocaleString() + ' pcs';
-
-    const avgAvail = totalPlannedMins > 0 ? (totalOperatingMins / totalPlannedMins) * 100 : 0;
-    const avgPerf = totalOperatingMins > 0 ? Math.min(100, (totalIdealMins / totalOperatingMins) * 100) : 0;
-    const avgQual = totalProduced > 0 ? (totalGood / totalProduced) * 100 : 100;
-    const overallOee = (avgAvail / 100) * (avgPerf / 100) * (avgQual / 100) * 100;
-
-    if (calcAvailEl) calcAvailEl.textContent = avgAvail.toFixed(1) + '%';
-    if (calcPerfEl) calcPerfEl.textContent = avgPerf.toFixed(1) + '%';
-    if (calcQualEl) calcQualEl.textContent = avgQual.toFixed(1) + '%';
-    if (calcOeeEl) calcOeeEl.textContent = overallOee.toFixed(1) + '%';
-    if (dashOeeEl) dashOeeEl.textContent = document.getElementById('kpiOverallOee')?.textContent || overallOee.toFixed(1) + '%';
+    if (calcAvailEl) calcAvailEl.textContent = stats.avail.toFixed(1) + '%';
+    if (calcPerfEl) calcPerfEl.textContent = stats.perf.toFixed(1) + '%';
+    if (calcQualEl) calcQualEl.textContent = stats.qual.toFixed(1) + '%';
+    if (calcOeeEl) calcOeeEl.textContent = stats.oee.toFixed(1) + '%';
+    if (dashOeeEl) dashOeeEl.textContent = document.getElementById('kpiOverallOee')?.textContent || stats.oee.toFixed(1) + '%';
   }
 
   /* ==========================================================================
@@ -1265,39 +1316,16 @@ if (shareBtn) {
     updateMonthFilterOptions();
     const logs = getFilteredLogs();
 
-    const hammerFilter = document.getElementById('globalHammerFilter').value;
-    const shiftFilter = document.getElementById('globalShiftFilter').value;
-    const monthFilter = document.getElementById('globalRangeFilter').value;
-
-    let totalPlannedMins = 0;
-    let totalOperatingMins = 0;
-    let totalIdealMins = 0;
-    let totalProduced = 0;
-    let totalGood = 0;
-
-    logs.forEach(l => {
-      totalPlannedMins += l.plannedTimeMins;
-      totalOperatingMins += l.operatingTimeMins;
-      totalIdealMins += Math.min(l.operatingTimeMins, (l.totalParts * l.idealCycleSec) / 60);
-      totalProduced += l.totalParts;
-      totalGood += l.goodParts;
-    });
-
-    const avgAvail = totalPlannedMins > 0 ? (totalOperatingMins / totalPlannedMins) * 100 : 0;
-    const avgPerf = totalOperatingMins > 0 ? Math.min(100, (totalIdealMins / totalOperatingMins) * 100) : 0;
-    const avgQual = totalProduced > 0 ? (totalGood / totalProduced) * 100 : 100;
-    const overallOee = (avgAvail / 100) * (avgPerf / 100) * (avgQual / 100) * 100;
+    const stats = calculateFleetKpis(logs);
 
     console.log('--- DASHBOARD RECALCULATION DEBUG ---');
     console.log('Total Supabase records loaded:', shiftLogs.length);
-    console.log('Selected machine:', hammerFilter);
-    console.log('Selected month:', monthFilter);
-    console.log('Selected shift:', shiftFilter);
-    console.log('Number of records after filtering:', logs.length);
-    console.log('Calculated Availability:', avgAvail.toFixed(1) + '%');
-    console.log('Calculated Performance:', avgPerf.toFixed(1) + '%');
-    console.log('Calculated Quality:', avgQual.toFixed(1) + '%');
-    console.log('Calculated OEE:', overallOee.toFixed(1) + '%');
+    console.log('Filtered part entries:', logs.length);
+    console.log('Filtered unique hammer-shifts:', stats.totalShifts);
+    console.log('Calculated Availability:', stats.avail.toFixed(1) + '%');
+    console.log('Calculated Performance:', stats.perf.toFixed(1) + '%');
+    console.log('Calculated Quality:', stats.qual.toFixed(1) + '%');
+    console.log('Calculated OEE:', stats.oee.toFixed(1) + '%');
 
     updateDebugDiagnosticsPanel(logs);
     updateDataReconciliationPanel(logs);
@@ -1680,42 +1708,23 @@ if (shareBtn) {
       return;
     }
 
-    let totalPlannedMins = 0;
-    let totalOperatingMins = 0;
-    let totalIdealMins = 0;
-    let totalProduced = 0;
-    let totalGood = 0;
-    let totalRejects = 0;
+    const stats = calculateFleetKpis(logs);
 
-    logs.forEach(l => {
-      totalPlannedMins += l.plannedTimeMins;
-      totalOperatingMins += l.operatingTimeMins;
-      totalIdealMins += Math.min(l.operatingTimeMins, (l.totalParts * l.idealCycleSec) / 60);
-      totalProduced += l.totalParts;
-      totalGood += l.goodParts;
-      totalRejects += l.rejects;
-    });
+    const scrapPct = stats.totalPcs > 0 ? ((stats.rejectPcs / stats.totalPcs) * 100).toFixed(1) : '0.0';
 
-    const avgAvail = totalPlannedMins > 0 ? Math.min(100, (totalOperatingMins / totalPlannedMins) * 100) : 0;
-    const avgPerf = totalOperatingMins > 0 ? Math.min(100, (totalIdealMins / totalOperatingMins) * 100) : 0;
-    const avgQual = totalProduced > 0 ? Math.min(100, (totalGood / totalProduced) * 100) : 100;
-    const overallOee = (avgAvail / 100) * (avgPerf / 100) * (avgQual / 100) * 100;
+    document.getElementById('kpiOverallOee').textContent = stats.oee.toFixed(1) + '%';
+    document.getElementById('kpiAvailability').textContent = stats.avail.toFixed(1) + '%';
+    document.getElementById('kpiPerformance').textContent = stats.perf.toFixed(1) + '%';
+    document.getElementById('kpiQuality').textContent = stats.qual.toFixed(1) + '%';
 
-    const scrapPct = totalProduced > 0 ? ((totalRejects / totalProduced) * 100).toFixed(1) : '0.0';
-
-    document.getElementById('kpiOverallOee').textContent = overallOee.toFixed(1) + '%';
-    document.getElementById('kpiAvailability').textContent = avgAvail.toFixed(1) + '%';
-    document.getElementById('kpiPerformance').textContent = avgPerf.toFixed(1) + '%';
-    document.getElementById('kpiQuality').textContent = avgQual.toFixed(1) + '%';
-
-    document.getElementById('kpiPlannedHours').textContent = `Net Planned: ${(totalPlannedMins / 60).toFixed(1)} hrs`;
-    document.getElementById('kpiTotalPieces').textContent = `Good Parts: ${totalGood.toLocaleString()} pcs`;
-    document.getElementById('kpiScrapRate').textContent = `Rejects: ${totalRejects.toLocaleString()} pcs (${scrapPct}%)`;
+    document.getElementById('kpiPlannedHours').textContent = `Net Planned: ${(stats.plannedMins / 60).toFixed(1)} hrs (${stats.totalShifts} shifts)`;
+    document.getElementById('kpiTotalPieces').textContent = `Good Parts: ${stats.goodPcs.toLocaleString()} pcs`;
+    document.getElementById('kpiScrapRate').textContent = `Rejects: ${stats.rejectPcs.toLocaleString()} pcs (${scrapPct}%)`;
 
     const oeeStatusEl = document.getElementById('kpiOeeStatus');
-    if (overallOee >= 85) {
+    if (stats.oee >= 85) {
       oeeStatusEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i> World-Class (≥85%)';
-    } else if (overallOee >= 75) {
+    } else if (stats.oee >= 75) {
       oeeStatusEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i> Meets Target (≥75%)';
     } else {
       oeeStatusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-warning"></i> Below Target (<75%)';
@@ -2015,23 +2024,11 @@ if (shareBtn) {
     HAMMERS.forEach((h, idx) => {
       const hLogs = filteredLogs.filter(l => l.machine === h.name);
       
-      let oee = 0, avail = 0, perf = 0, qual = 0;
-
-      if (hLogs.length > 0) {
-        let pMins = 0, oMins = 0, iMins = 0, totalParts = 0, goodParts = 0;
-        hLogs.forEach(l => {
-          pMins += l.plannedTimeMins;
-          oMins += l.operatingTimeMins;
-          iMins += (l.totalParts * l.idealCycleSec) / 60;
-          totalParts += l.totalParts;
-          goodParts += l.goodParts;
-        });
-
-        avail = pMins > 0 ? (oMins / pMins) * 100 : 0;
-        perf = oMins > 0 ? Math.min(100, (iMins / oMins) * 100) : 0;
-        qual = totalParts > 0 ? (goodParts / totalParts) * 100 : 100;
-        oee = (avail / 100) * (perf / 100) * (qual / 100) * 100;
-      }
+      const stats = calculateFleetKpis(hLogs);
+      const oee = stats.oee;
+      const avail = stats.avail;
+      const perf = stats.perf;
+      const qual = stats.qual;
 
       let statusClass = 'success';
       let statusText = 'RUNNING';
@@ -2295,27 +2292,14 @@ if (shareBtn) {
 
     const calcGroupOee = (logArr) => {
       if (!logArr || logArr.length === 0) return null;
-      let pMins = 0, oMins = 0, iMins = 0, totalPcs = 0, goodPcs = 0;
-      logArr.forEach(l => {
-        pMins += l.plannedTimeMins;
-        oMins += l.operatingTimeMins;
-        iMins += (l.totalParts * l.idealCycleSec) / 60;
-        totalPcs += l.totalParts;
-        goodPcs += l.goodParts;
-      });
-
-      const avail = pMins > 0 ? (oMins / pMins) * 100 : 0;
-      const perf = oMins > 0 ? Math.min(100, (iMins / oMins) * 100) : 0;
-      const qual = totalPcs > 0 ? (goodPcs / totalPcs) * 100 : 100;
-      const oee = (avail / 100) * (perf / 100) * (qual / 100) * 100;
-
+      const res = calculateFleetKpis(logArr);
       return {
-        avail: parseFloat(avail.toFixed(1)),
-        perf: parseFloat(perf.toFixed(1)),
-        qual: parseFloat(qual.toFixed(1)),
-        oee: parseFloat(oee.toFixed(1)),
-        goodPcs: goodPcs,
-        totalShifts: logArr.length
+        avail: res.avail,
+        perf: res.perf,
+        qual: res.qual,
+        oee: res.oee,
+        goodPcs: res.goodPcs,
+        totalShifts: res.totalShifts
       };
     };
 
@@ -2341,7 +2325,7 @@ if (shareBtn) {
       monthlyStatsRows.push({
         monthLabel: formatMonthLabel(mKey),
         monthKey: mKey,
-        totalShifts: mData.overall.length,
+        totalShifts: overallRes ? overallRes.totalShifts : 0,
         goodPcs: overallRes ? overallRes.goodPcs : 0,
         overallOee: overallRes ? overallRes.oee : 0,
         hammerOees: rowHammerOees
@@ -2456,39 +2440,23 @@ if (shareBtn) {
 
     const hammerStats = HAMMERS.map(h => {
       const hLogs = logs.filter(l => l.machine === h.name);
-      let pMins = 0, oMins = 0, iMins = 0, downtimeMins = 0;
-      let totalPcs = 0, goodPcs = 0, rejectsPcs = 0;
-
-      hLogs.forEach(l => {
-        pMins += l.plannedTimeMins;
-        oMins += l.operatingTimeMins;
-        downtimeMins += l.totalDowntimeMins;
-        iMins += Math.min(l.operatingTimeMins, (l.totalParts * l.idealCycleSec) / 60);
-        totalPcs += l.totalParts;
-        goodPcs += l.goodParts;
-        rejectsPcs += l.rejects;
-      });
-
-      const avail = pMins > 0 ? Math.min(100, (oMins / pMins) * 100) : 0;
-      const perf = oMins > 0 ? Math.min(100, (iMins / oMins) * 100) : 0;
-      const qual = totalPcs > 0 ? Math.min(100, (goodPcs / totalPcs) * 100) : 100;
-      const oee = (avail / 100) * (perf / 100) * (qual / 100) * 100;
+      const res = calculateFleetKpis(hLogs);
 
       return {
         name: h.name,
         capacity: h.capacity,
         color: h.color,
-        shiftsCount: hLogs.length,
-        plannedHrs: (pMins / 60).toFixed(1),
-        operatingHrs: (oMins / 60).toFixed(1),
-        downtimeHrs: (downtimeMins / 60).toFixed(1),
-        totalPcs: totalPcs,
-        goodPcs: goodPcs,
-        rejectsPcs: rejectsPcs,
-        avail: parseFloat(avail.toFixed(1)),
-        perf: parseFloat(perf.toFixed(1)),
-        qual: parseFloat(qual.toFixed(1)),
-        oee: parseFloat(oee.toFixed(1))
+        shiftsCount: res.totalShifts,
+        plannedHrs: (res.plannedMins / 60).toFixed(1),
+        operatingHrs: (res.operatingMins / 60).toFixed(1),
+        downtimeHrs: ((res.plannedMins - res.operatingMins) / 60).toFixed(1),
+        totalPcs: res.totalPcs,
+        goodPcs: res.goodPcs,
+        rejectsPcs: res.rejectPcs,
+        avail: res.avail,
+        perf: res.perf,
+        qual: res.qual,
+        oee: res.oee
       };
     });
 
