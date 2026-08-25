@@ -877,24 +877,65 @@ if (shareBtn) {
       });
   }
 
+  let rawProdLoadedCount = 0;
+  let rawQualLoadedCount = 0;
+  let rawDownLoadedCount = 0;
+
+  /* Paginated Table Fetcher - Fetches 100% of rows from Supabase (Bypassing PostgREST 1000-row limit) */
+  async function fetchSupabaseTablePaginated(tableName) {
+    if (!supabaseClient) return [];
+    
+    let allRecords = [];
+    const pageSize = 1000;
+    let page = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error } = await supabaseClient
+        .from(tableName)
+        .select('*')
+        .eq('is_deleted', false)
+        .range(from, to);
+
+      if (error) {
+        console.error(`Error fetching page ${page} of ${tableName}:`, error);
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        allRecords = allRecords.concat(data);
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    return allRecords;
+  }
+
   /* Single Source of Truth Fetcher */
-  function fetchSupabaseShiftLogs() {
+  async function fetchSupabaseShiftLogs() {
     if (!supabaseClient) return;
 
     const pill = document.getElementById('cloudDbStatusPill');
 
-    Promise.all([
-      supabaseClient.from('production_data').select('*').eq('is_deleted', false).limit(50000),
-      supabaseClient.from('quality_data').select('*').eq('is_deleted', false).limit(50000),
-      supabaseClient.from('downtime_data').select('*').eq('is_deleted', false).limit(50000)
-    ]).then(([prodRes, qualRes, downRes]) => {
-      if (prodRes.error) throw prodRes.error;
-      if (qualRes.error) throw qualRes.error;
-      if (downRes.error) throw downRes.error;
+    try {
+      const [prodList, qualList, downList] = await Promise.all([
+        fetchSupabaseTablePaginated('production_data'),
+        fetchSupabaseTablePaginated('quality_data'),
+        fetchSupabaseTablePaginated('downtime_data')
+      ]);
 
-      const prodList = prodRes.data || [];
-      const qualList = qualRes.data || [];
-      const downList = downRes.data || [];
+      rawProdLoadedCount = prodList.length;
+      rawQualLoadedCount = qualList.length;
+      rawDownLoadedCount = downList.length;
 
       qualityLogs = qualList;
 
@@ -954,7 +995,7 @@ if (shareBtn) {
       // Single source of truth: Assign fetched Supabase logs unconditionally
       shiftLogs = fetchedLogs;
 
-      console.log('--- SUPABASE FETCH COMPLETED ---');
+      console.log('--- SUPABASE PAGINATED FETCH COMPLETED ---');
       console.log('production_data records loaded:', prodList.length);
       console.log('quality_data records loaded:', qualList.length);
       console.log('downtime_data records loaded:', downList.length);
@@ -967,14 +1008,14 @@ if (shareBtn) {
         pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live DB (${shiftLogs.length} logs)`;
         pill.style.borderColor = 'var(--primary)';
       }
-    }).catch(err => {
+    } catch (err) {
       console.error('Supabase Query Error:', err);
       showToast(`🔴 Supabase Query Failed: ${err.message || 'Database query error'}`, 'danger');
       if (pill) {
         pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-triangle-exclamation text-danger"></i> 🔴 Supabase Error: ${err.message || 'Failed'}`;
         pill.style.borderColor = 'var(--danger)';
       }
-    });
+    }
   }
 
   function setupCloudDbSync() {
@@ -1065,14 +1106,21 @@ if (shareBtn) {
   }
 
   function updateDebugDiagnosticsPanel(filteredLogs) {
+    const prodLoadEl = document.getElementById('dbgProdLoaded');
+    const qualLoadEl = document.getElementById('dbgQualLoaded');
+    const downLoadEl = document.getElementById('dbgDownLoaded');
     const rawEl = document.getElementById('dbgRawRecords');
+
+    const latestDateEl = document.getElementById('dbgLatestDate');
+    const earliestDateEl = document.getElementById('dbgEarliestDate');
+
     const selMachEl = document.getElementById('dbgSelMachine');
     const selMonthEl = document.getElementById('dbgSelMonth');
     const selShiftEl = document.getElementById('dbgSelShift');
     const filtEl = document.getElementById('dbgFilteredRecords');
+
     const dbMonthsEl = document.getElementById('dbgDbMonths');
     const dbMachinesEl = document.getElementById('dbgDbMachines');
-    const dbDatesEl = document.getElementById('dbgDbDates');
 
     const oeeCnt = document.getElementById('dbgOeeCnt');
     const oeeVal = document.getElementById('dbgOeeVal');
@@ -1085,7 +1133,14 @@ if (shareBtn) {
 
     const firstRec = document.getElementById('dbgFirstRecord');
 
+    if (prodLoadEl) prodLoadEl.textContent = rawProdLoadedCount;
+    if (qualLoadEl) qualLoadEl.textContent = rawQualLoadedCount;
+    if (downLoadEl) downLoadEl.textContent = rawDownLoadedCount;
     if (rawEl) rawEl.textContent = shiftLogs.length;
+
+    const allDates = shiftLogs.map(l => getStandardDateString(l.date)).filter(Boolean).sort();
+    if (earliestDateEl) earliestDateEl.textContent = allDates.length > 0 ? allDates[0] : '--';
+    if (latestDateEl) latestDateEl.textContent = allDates.length > 0 ? allDates[allDates.length - 1] : '--';
 
     const hVal = document.getElementById('globalHammerFilter')?.value || 'ALL';
     const sVal = document.getElementById('globalShiftFilter')?.value || 'ALL';
@@ -1098,11 +1153,9 @@ if (shareBtn) {
 
     const uniqueMonths = Array.from(new Set(shiftLogs.map(l => getYearMonthString(l.date)).filter(Boolean))).sort();
     const uniqueMachines = Array.from(new Set(shiftLogs.map(l => l.machine).filter(Boolean))).sort();
-    const firstDates = Array.from(new Set(shiftLogs.map(l => getStandardDateString(l.date)).filter(Boolean))).slice(0, 5);
 
     if (dbMonthsEl) dbMonthsEl.textContent = uniqueMonths.join(', ') || 'None';
     if (dbMachinesEl) dbMachinesEl.textContent = uniqueMachines.join(', ') || 'None';
-    if (dbDatesEl) dbDatesEl.textContent = firstDates.join(', ') || 'None';
 
     let totalPlannedMins = 0, totalOperatingMins = 0, totalIdealMins = 0, totalProduced = 0, totalGood = 0;
 
