@@ -58,6 +58,20 @@ const SUPABASE_CONFIG = {
 if (migrateBtn) {
     migrateBtn.addEventListener('click', migrateLocalLogsToSupabase);
 }
+    const shareBtn = document.getElementById('shareDataLinkBtn');
+
+if (shareBtn) {
+    shareBtn.addEventListener('click', async () => {
+        const liveUrl = window.location.origin + window.location.pathname;
+
+        try {
+            await navigator.clipboard.writeText(liveUrl);
+            showToast('Live link copied to clipboard!', 'success');
+        } catch (err) {
+            prompt('Copy this Live Link:', liveUrl);
+        }
+    });
+}
     setupLiveCalculator();
     setupExcelDropZone();
     setupHammerMiniDropzones();
