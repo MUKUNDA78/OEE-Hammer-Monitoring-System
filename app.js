@@ -53,7 +53,11 @@ const SUPABASE_CONFIG = {
     initTheme();
     loadShiftLogs();
     checkUrlForSharedData();
-    setupEventListeners();
+    const migrateBtn = document.getElementById('restoreBackupLogsBtn');
+
+if (migrateBtn) {
+    migrateBtn.addEventListener('click', migrateLocalLogsToSupabase);
+}
     setupLiveCalculator();
     setupExcelDropZone();
     setupHammerMiniDropzones();
