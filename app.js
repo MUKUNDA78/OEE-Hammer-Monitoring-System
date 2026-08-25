@@ -3348,20 +3348,6 @@
       });
     });
   }
-
-  function recoverAndRestoreData() {
-    const recovered = recoverAllPreviousLogs();
-    if (recovered.length > 0) {
-      shiftLogs = mergeLogArrays(shiftLogs, recovered);
-      saveShiftLogs();
-      renderAllViews();
-      showToast(`Recovered ${shiftLogs.length} shift logs!`, 'success');
-      alert(`Data Recovery Completed!\n\nSuccessfully scanned browser storage and recovered ${shiftLogs.length} total shift records. All data has been saved and broadcasted.`);
-    } else {
-      showToast('No backup logs found in local browser storage.', 'info');
-    }
-  }
-
   /* ==========================================================================
      EVENT LISTENERS & TAB NAVIGATION
      ========================================================================== */
@@ -3394,10 +3380,7 @@
       shareBtn.addEventListener('click', generateShareableDataUrl);
     }
 
-    const recoverBtn = document.getElementById('restoreBackupLogsBtn');
-    if (recoverBtn) {
-      recoverBtn.addEventListener('click', recoverAndRestoreData);
-    }
+    
 
     const filterIds = ['globalHammerFilter', 'globalShiftFilter', 'globalRangeFilter'];
     filterIds.forEach(id => {
