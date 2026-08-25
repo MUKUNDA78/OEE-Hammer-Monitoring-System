@@ -590,6 +590,12 @@ if (shareBtn) {
   }
 
   function loadShiftLogs() {
+    if (supabaseClient) {
+      shiftLogs = [];
+      try { localStorage.removeItem('oee_shift_logs_v10'); } catch (e) {}
+      return;
+    }
+
     const saved = localStorage.getItem('oee_shift_logs_v10');
     if (saved) {
       try {
@@ -1026,7 +1032,24 @@ if (shareBtn) {
   }
 
   function saveShiftLogs() {
-    localStorage.setItem('oee_shift_logs_v10', JSON.stringify(shiftLogs));
+    // Supabase is the single source of truth. Do not write massive JSON arrays to browser localStorage.
+    if (supabaseClient) {
+      try {
+        localStorage.removeItem('oee_shift_logs_v10');
+      } catch (e) {}
+      return;
+    }
+
+    try {
+      if (shiftLogs.length < 200) {
+        localStorage.setItem('oee_shift_logs_v10', JSON.stringify(shiftLogs));
+      } else {
+        localStorage.removeItem('oee_shift_logs_v10');
+      }
+    } catch (e) {
+      console.warn('LocalStorage quota exceeded or unavailable. Relying on Cloud Database / memory.', e);
+      try { localStorage.removeItem('oee_shift_logs_v10'); } catch (err) {}
+    }
   }
 
   function updateMonthFilterOptions() {
