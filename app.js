@@ -2686,12 +2686,16 @@ const SUPABASE_CONFIG = {
     document.getElementById('exportSummaryExcelBtn').addEventListener('click', exportSummaryExcel);
     document.getElementById('exportLogsCsvBtn').addEventListener('click', exportLogsCsv);
 
-    document.getElementById('reloadSampleDataBtn').addEventListener('click', () => {
-      shiftLogs = generateDefaultLogs();
-      saveShiftLogs();
-      renderAllViews();
-      showToast('Reloaded sample historical data.', 'info');
+   const reloadSampleDataBtn = document.getElementById('reloadSampleDataBtn');
+
+if (reloadSampleDataBtn) {
+    reloadSampleDataBtn.addEventListener('click', () => {
+        shiftLogs = generateDefaultLogs();
+        saveShiftLogs();
+        renderAllViews();
+        showToast('Reloaded sample historical data.', 'info');
     });
+}
 
     const clearAllLogsAction = () => {
       shiftLogs = [];
