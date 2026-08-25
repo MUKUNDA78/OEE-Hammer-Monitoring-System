@@ -872,6 +872,8 @@ if (shareBtn) {
       supabaseClient.from('downtime_data').select('*').eq('is_deleted', false)
     ]).then(([prodRes, qualRes, downRes]) => {
       if (prodRes.error) throw prodRes.error;
+      if (qualRes.error) throw qualRes.error;
+      if (downRes.error) throw downRes.error;
 
       const prodList = prodRes.data || [];
       const qualList = qualRes.data || [];
@@ -932,164 +934,42 @@ if (shareBtn) {
         });
       });
 
-      if (fetchedLogs.length > 0) {
-        shiftLogs = fetchedLogs;
-        saveShiftLogs();
-        renderAllViews();
-        if (pill) {
-          pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live DB (${shiftLogs.length} logs)`;
-          pill.style.borderColor = 'var(--primary)';
-        }
+      // Single source of truth: Assign fetched Supabase logs unconditionally
+      shiftLogs = fetchedLogs;
+
+      console.log('--- SUPABASE FETCH COMPLETED ---');
+      console.log('production_data records loaded:', prodList.length);
+      console.log('quality_data records loaded:', qualList.length);
+      console.log('downtime_data records loaded:', downList.length);
+      console.log('Total mapped shiftLogs:', shiftLogs.length);
+
+      saveShiftLogs();
+      renderAllViews();
+
+      if (pill) {
+        pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud"></i> 🟢 Live DB (${shiftLogs.length} logs)`;
+        pill.style.borderColor = 'var(--primary)';
       }
     }).catch(err => {
-      console.warn('Supabase fetch warning:', err);
+      console.error('Supabase Query Error:', err);
+      showToast(`🔴 Supabase Query Failed: ${err.message || 'Database query error'}`, 'danger');
       if (pill) {
-        pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-triangle-exclamation text-danger"></i> 🔴 Connection Lost / Retrying';
+        pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-triangle-exclamation text-danger"></i> 🔴 Supabase Error: ${err.message || 'Failed'}`;
         pill.style.borderColor = 'var(--danger)';
       }
     });
   }
 
-  let cloudSyncTimer = null;
-  const defaultCloudEndpoint = 'https://raw.githubusercontent.com/MUKUNDA78/OEE-Hammer-Monitoring-System/master/shift_logs_db.json';
-
-  function getCloudEndpoint() {
-    const input = document.getElementById('cloudDbEndpointInput');
-    return (input && input.value.trim()) ? input.value.trim() : defaultCloudEndpoint;
-  }
-
-  function pullFromCloudDb(silent = false) {
-    const endpoint = getCloudEndpoint();
-    const pill = document.getElementById('cloudDbStatusPill');
-
-    if (pill) {
-      pill.innerHTML = '<span class="dot"></span> <i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
-    }
-
-    fetch(endpoint, { cache: 'no-cache' })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        let fetchedLogs = [];
-        if (Array.isArray(data)) {
-          fetchedLogs = data;
-        } else if (data && Array.isArray(data.shiftLogs)) {
-          fetchedLogs = data.shiftLogs;
-        }
-
-        if (fetchedLogs.length > 0 && !window.HAS_URL_DATA) {
-          shiftLogs = mergeLogArrays(shiftLogs, fetchedLogs);
-          saveShiftLogs();
-          renderAllViews();
-          if (!silent) showToast(`Online DB Synced! ${shiftLogs.length} logs active.`, 'success');
-        } else if (!silent) {
-          showToast('Online DB connected. Ready for multi-user shift uploads.', 'info');
-        }
-
-        if (pill) {
-          pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud"></i> Online DB (${shiftLogs.length} logs)`;
-          pill.style.borderColor = 'var(--primary)';
-        }
-      })
-      .catch(err => {
-        console.warn('Cloud DB pull failed:', err);
-        if (!silent) showToast('Local storage active. (Click Share Live Link to sync devices)', 'info');
-        if (pill) {
-          pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-cloud-arrow-up"></i> Multi-User Share Active`;
-        }
-      });
-  }
-
-  let firebaseDbRef = null;
-  let isRemoteUpdating = false;
-
-  function initRealtimeCloudDatabase() {
-    const endpoint = getCloudEndpoint();
-    const pill = document.getElementById('cloudDbStatusPill');
-
-    if (typeof firebase !== 'undefined' && endpoint.includes('firebaseio.com')) {
-      try {
-        if (!firebase.apps.length) {
-          firebase.initializeApp({ databaseURL: endpoint });
-        }
-        firebaseDbRef = firebase.database().ref('shiftLogs');
-
-        firebaseDbRef.on('value', (snapshot) => {
-          const val = snapshot.val();
-          if (val) {
-            let fetchedLogs = Array.isArray(val) ? val : Object.values(val);
-            if (fetchedLogs.length > 0) {
-              isRemoteUpdating = true;
-              shiftLogs = mergeLogArrays(shiftLogs, fetchedLogs);
-              localStorage.setItem('oee_shift_logs_v10', JSON.stringify(shiftLogs));
-              localStorage.setItem('oee_shift_logs_backup', JSON.stringify(shiftLogs));
-              renderAllViews();
-              isRemoteUpdating = false;
-              if (pill) {
-                pill.innerHTML = `<span class="dot"></span> <i class="fa-solid fa-bolt"></i> Realtime Sync (${shiftLogs.length} logs)`;
-                pill.style.borderColor = 'var(--primary)';
-              }
-            }
-          } else if (shiftLogs.length > 0) {
-            // Remote DB empty, broadcast local logs to populate Cloud DB!
-            broadcastDataToCloud();
-          }
-        });
-        console.log('Firebase Realtime Multi-User Live Sync initialized.');
-      } catch (err) {
-        console.warn('Firebase init warning:', err);
-      }
-    }
-  }
-
-  function broadcastDataToCloud() {
-    if (isRemoteUpdating) return;
-
-    if (firebaseDbRef && shiftLogs.length > 0) {
-      firebaseDbRef.set(shiftLogs)
-        .then(() => {
-          showToast('⚡ Live data broadcasted to all connected users!', 'success');
-        })
-        .catch(err => {
-          console.warn('Firebase broadcast failed:', err);
-        });
-    }
-  }
-
   function setupCloudDbSync() {
-    initRealtimeCloudDatabase();
-
     const syncHeaderBtn = document.getElementById('cloudDbSyncBtn');
     const pullBtn = document.getElementById('pullFromCloudDbBtn');
-    const pushBtn = document.getElementById('pushToCloudDbBtn');
-    const autoSelect = document.getElementById('autoCloudSyncSelect');
 
-    if (syncHeaderBtn) syncHeaderBtn.addEventListener('click', () => pullFromCloudDb(false));
-    if (pullBtn) pullBtn.addEventListener('click', () => pullFromCloudDb(false));
-    if (pushBtn) pushBtn.addEventListener('click', () => broadcastDataToCloud());
-
-    if (autoSelect) {
-      autoSelect.addEventListener('change', () => {
-        if (cloudSyncTimer) clearInterval(cloudSyncTimer);
-        const val = autoSelect.value;
-        if (val !== 'OFF') {
-          const sec = parseInt(val, 10);
-          cloudSyncTimer = setInterval(() => pullFromCloudDb(true), sec * 1000);
-          showToast(`Auto Cloud Sync enabled every ${sec}s!`, 'info');
-        } else {
-          showToast('Auto Cloud Sync disabled. Use Manual Sync.', 'info');
-        }
-      });
-
-      cloudSyncTimer = setInterval(() => pullFromCloudDb(true), 10000);
-    }
+    if (syncHeaderBtn) syncHeaderBtn.addEventListener('click', () => fetchSupabaseShiftLogs());
+    if (pullBtn) pullBtn.addEventListener('click', () => fetchSupabaseShiftLogs());
   }
 
   function saveShiftLogs() {
     localStorage.setItem('oee_shift_logs_v10', JSON.stringify(shiftLogs));
-    broadcastDataToCloud();
   }
 
   function updateMonthFilterOptions() {
@@ -1102,6 +982,11 @@ if (shareBtn) {
     shiftLogs.forEach(l => {
       if (l.date && l.date.length >= 7) {
         monthSet.add(l.date.substring(0, 7));
+      }
+    });
+    qualityLogs.forEach(q => {
+      if (q.date && q.date.length >= 7) {
+        monthSet.add(q.date.substring(0, 7));
       }
     });
 
@@ -1117,27 +1002,21 @@ if (shareBtn) {
     };
 
     let html = `<option value="ALL">All Months (Combined)</option>`;
-    if (sortedMonths.length === 0) {
-      html += `
-        <option value="2026-07">Jul 2026</option>
-        <option value="2026-06">Jun 2026</option>
-        <option value="2026-05">May 2026</option>
-        <option value="2026-04">Apr 2026</option>
-        <option value="2026-03">Mar 2026</option>
-        <option value="2026-02">Feb 2026</option>
-        <option value="2026-01">Jan 2026</option>
-      `;
-    } else {
-      sortedMonths.forEach(m => {
-        html += `<option value="${m}">${formatMonthLabel(m)}</option>`;
-      });
-    }
+    sortedMonths.forEach(m => {
+      html += `<option value="${m}">${formatMonthLabel(m)}</option>`;
+    });
 
-    select.innerHTML = html;
-    if (Array.from(select.options).some(opt => opt.value === currentSelected)) {
-      select.value = currentSelected;
-    } else {
-      select.value = 'ALL';
+    // Only update innerHTML if options list changed to avoid resetting user selection during interaction
+    const existingValues = Array.from(select.options).map(o => o.value).join(',');
+    const newValues = ['ALL', ...sortedMonths].join(',');
+
+    if (existingValues !== newValues) {
+      select.innerHTML = html;
+      if (Array.from(select.options).some(opt => opt.value === currentSelected)) {
+        select.value = currentSelected;
+      } else {
+        select.value = 'ALL';
+      }
     }
   }
 
@@ -1147,9 +1026,13 @@ if (shareBtn) {
     const monthFilter = document.getElementById('globalRangeFilter').value;
 
     return shiftLogs.filter(log => {
+      // 1. Machine / Hammer filter
       if (hammerFilter !== 'ALL' && log.machine !== hammerFilter) return false;
+
+      // 2. Shift filter
       if (shiftFilter !== 'ALL' && log.shift !== shiftFilter) return false;
 
+      // 3. Month filter (YYYY-MM)
       if (monthFilter !== 'ALL') {
         if (!log.date || !log.date.startsWith(monthFilter)) return false;
       }
@@ -1163,8 +1046,43 @@ if (shareBtn) {
      ========================================================================== */
   function renderAllViews() {
     shiftLogs = shiftLogs.map(l => calculateOeeRecord(l));
-    const logs = getFilteredLogs();
     updateMonthFilterOptions();
+    const logs = getFilteredLogs();
+
+    const hammerFilter = document.getElementById('globalHammerFilter').value;
+    const shiftFilter = document.getElementById('globalShiftFilter').value;
+    const monthFilter = document.getElementById('globalRangeFilter').value;
+
+    let totalPlannedMins = 0;
+    let totalOperatingMins = 0;
+    let totalIdealMins = 0;
+    let totalProduced = 0;
+    let totalGood = 0;
+
+    logs.forEach(l => {
+      totalPlannedMins += l.plannedTimeMins;
+      totalOperatingMins += l.operatingTimeMins;
+      totalIdealMins += Math.min(l.operatingTimeMins, (l.totalParts * l.idealCycleSec) / 60);
+      totalProduced += l.totalParts;
+      totalGood += l.goodParts;
+    });
+
+    const avgAvail = totalPlannedMins > 0 ? (totalOperatingMins / totalPlannedMins) * 100 : 0;
+    const avgPerf = totalOperatingMins > 0 ? Math.min(100, (totalIdealMins / totalOperatingMins) * 100) : 0;
+    const avgQual = totalProduced > 0 ? (totalGood / totalProduced) * 100 : 100;
+    const overallOee = (avgAvail / 100) * (avgPerf / 100) * (avgQual / 100) * 100;
+
+    console.log('--- DASHBOARD RECALCULATION DEBUG ---');
+    console.log('Total Supabase records loaded:', shiftLogs.length);
+    console.log('Selected machine:', hammerFilter);
+    console.log('Selected month:', monthFilter);
+    console.log('Selected shift:', shiftFilter);
+    console.log('Number of records after filtering:', logs.length);
+    console.log('Calculated Availability:', avgAvail.toFixed(1) + '%');
+    console.log('Calculated Performance:', avgPerf.toFixed(1) + '%');
+    console.log('Calculated Quality:', avgQual.toFixed(1) + '%');
+    console.log('Calculated OEE:', overallOee.toFixed(1) + '%');
+
     updateHammerLogCountBadges();
     renderOverviewKpis(logs);
     renderHammerGauges(logs);
@@ -1533,14 +1451,14 @@ if (shareBtn) {
 
   function renderOverviewKpis(logs) {
     if (logs.length === 0) {
-      document.getElementById('kpiOverallOee').textContent = '--%';
-      document.getElementById('kpiAvailability').textContent = '--%';
-      document.getElementById('kpiPerformance').textContent = '--%';
-      document.getElementById('kpiQuality').textContent = '--%';
+      document.getElementById('kpiOverallOee').textContent = '0.0%';
+      document.getElementById('kpiAvailability').textContent = '0.0%';
+      document.getElementById('kpiPerformance').textContent = '0.0%';
+      document.getElementById('kpiQuality').textContent = '0.0%';
       document.getElementById('kpiPlannedHours').textContent = 'Net Planned: 0 hrs';
       document.getElementById('kpiTotalPieces').textContent = 'Good Parts: 0 pcs';
       document.getElementById('kpiScrapRate').textContent = 'Rejects: 0 pcs (0.0%)';
-      document.getElementById('kpiOeeStatus').innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-primary"></i> Ready for Excel Upload';
+      document.getElementById('kpiOeeStatus').innerHTML = '<i class="fa-solid fa-triangle-exclamation text-warning"></i> No data available for the selected Machine and Month';
       return;
     }
 
@@ -3334,7 +3252,7 @@ if (reloadSampleDataBtn) {
     tbody.innerHTML = '';
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="22" style="text-align: center; color: var(--text-muted); padding: 24px;">No shift records found matching current filters.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="22" style="text-align: center; color: var(--text-muted); padding: 24px; font-weight: 600;">No data available for the selected Machine and Month</td></tr>`;
       counter.textContent = 'Showing 0 records';
       return;
     }
