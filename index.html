@@ -227,6 +227,38 @@
         <div>First Filtered Record: <pre id="dbgFirstRecord" style="margin:4px 0 0 0; font-size:10px; max-height:75px; overflow:auto; color:#cbd5e1; background:rgba(0,0,0,0.6); padding:6px; border-radius:4px; white-space: pre-wrap;">None</pre></div>
       </div>
 
+      <!-- Mandatory Data Reconciliation Panel (Step 11 Requirement) -->
+      <div id="dataReconciliationPanel" style="background: rgba(15, 23, 42, 0.95); color: #e2e8f0; font-family: monospace; font-size: 11px; padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #0284c7; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div style="font-weight: 700; font-size: 13px; color: #38bdf8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+          <span>⚖️ DATA RECONCILIATION AUDIT PANEL</span>
+          <span style="background: #0284c7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Single Source of Truth</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px;">
+          <div>Production Records: <strong id="reconProdCnt" style="color:#38bdf8;">0</strong></div>
+          <div>Quality Records: <strong id="reconQualCnt" style="color:#38bdf8;">0</strong></div>
+          <div>Downtime Records: <strong id="reconDownCnt" style="color:#38bdf8;">0</strong></div>
+          <div>Matched Business Records: <strong id="reconMatchedCnt" style="color:#00ff88;">0</strong></div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 8px; font-size: 10px;">
+          <div>Unmatched Production: <span id="reconUnmatchedProd" style="color: #4ade80;">0</span></div>
+          <div>Unmatched Quality: <span id="reconUnmatchedQual" style="color: #4ade80;">0</span></div>
+          <div>Unmatched Downtime: <span id="reconUnmatchedDown" style="color: #4ade80;">0</span></div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 8px; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px;">
+          <div>Total Parts: <strong id="reconTotParts" style="color:#fff;">0 pcs</strong></div>
+          <div>Good Parts: <strong id="reconGoodParts" style="color:#4ade80;">0 pcs</strong></div>
+          <div>Reject Parts: <strong id="reconRejectParts" style="color:#f87171;">0 pcs</strong></div>
+        </div>
+        <div style="margin-bottom: 6px; font-size: 11px; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px;">
+          <strong>Mathematical Formula Audit:</strong><br>
+          Calculated Availability: <strong id="reconCalcAvail" style="color:#38bdf8;">0.0%</strong> |
+          Calculated Performance: <strong id="reconCalcPerf" style="color:#38bdf8;">0.0%</strong> |
+          Calculated Quality: <strong id="reconCalcQual" style="color:#38bdf8;">0.0%</strong><br>
+          Calculated Weighted OEE: <strong id="reconCalcOee" style="color:#00ff88; font-size: 13px;">0.0%</strong> |
+          Dashboard Displayed OEE: <strong id="reconDashOee" style="color:#facc15; font-size: 13px;">0.0%</strong>
+        </div>
+      </div>
+
       <!-- TAB 1: OVERVIEW -->
       <section class="tab-content active" id="tab-overview">
         

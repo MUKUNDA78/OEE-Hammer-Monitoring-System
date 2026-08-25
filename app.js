@@ -1200,6 +1200,63 @@ if (shareBtn) {
     }
   }
 
+  function updateDataReconciliationPanel(filteredLogs) {
+    const prodCntEl = document.getElementById('reconProdCnt');
+    const qualCntEl = document.getElementById('reconQualCnt');
+    const downCntEl = document.getElementById('reconDownCnt');
+    const matchedCntEl = document.getElementById('reconMatchedCnt');
+
+    const unProdEl = document.getElementById('reconUnmatchedProd');
+    const unQualEl = document.getElementById('reconUnmatchedQual');
+    const unDownEl = document.getElementById('reconUnmatchedDown');
+
+    const totPartsEl = document.getElementById('reconTotParts');
+    const goodPartsEl = document.getElementById('reconGoodParts');
+    const rejectPartsEl = document.getElementById('reconRejectParts');
+
+    const calcAvailEl = document.getElementById('reconCalcAvail');
+    const calcPerfEl = document.getElementById('reconCalcPerf');
+    const calcQualEl = document.getElementById('reconCalcQual');
+    const calcOeeEl = document.getElementById('reconCalcOee');
+    const dashOeeEl = document.getElementById('reconDashOee');
+
+    if (prodCntEl) prodCntEl.textContent = rawProdLoadedCount;
+    if (qualCntEl) qualCntEl.textContent = rawQualLoadedCount;
+    if (downCntEl) downCntEl.textContent = rawDownLoadedCount;
+    if (matchedCntEl) matchedCntEl.textContent = filteredLogs.length;
+
+    if (unProdEl) unProdEl.textContent = '0';
+    if (unQualEl) unQualEl.textContent = '0';
+    if (unDownEl) unDownEl.textContent = '0';
+
+    let totalPlannedMins = 0, totalOperatingMins = 0, totalIdealMins = 0, totalProduced = 0, totalGood = 0;
+
+    filteredLogs.forEach(l => {
+      totalPlannedMins += parseNum(l.plannedTimeMins, 660);
+      totalOperatingMins += parseNum(l.operatingTimeMins);
+      totalIdealMins += Math.min(parseNum(l.operatingTimeMins), (parseNum(l.totalParts) * parseNum(l.idealCycleSec, 45)) / 60);
+      totalProduced += parseNum(l.totalParts);
+      totalGood += parseNum(l.goodParts);
+    });
+
+    const totalRejects = totalProduced - totalGood;
+
+    if (totPartsEl) totPartsEl.textContent = totalProduced.toLocaleString() + ' pcs';
+    if (goodPartsEl) goodPartsEl.textContent = totalGood.toLocaleString() + ' pcs';
+    if (rejectPartsEl) rejectPartsEl.textContent = totalRejects.toLocaleString() + ' pcs';
+
+    const avgAvail = totalPlannedMins > 0 ? (totalOperatingMins / totalPlannedMins) * 100 : 0;
+    const avgPerf = totalOperatingMins > 0 ? Math.min(100, (totalIdealMins / totalOperatingMins) * 100) : 0;
+    const avgQual = totalProduced > 0 ? (totalGood / totalProduced) * 100 : 100;
+    const overallOee = (avgAvail / 100) * (avgPerf / 100) * (avgQual / 100) * 100;
+
+    if (calcAvailEl) calcAvailEl.textContent = avgAvail.toFixed(1) + '%';
+    if (calcPerfEl) calcPerfEl.textContent = avgPerf.toFixed(1) + '%';
+    if (calcQualEl) calcQualEl.textContent = avgQual.toFixed(1) + '%';
+    if (calcOeeEl) calcOeeEl.textContent = overallOee.toFixed(1) + '%';
+    if (dashOeeEl) dashOeeEl.textContent = document.getElementById('kpiOverallOee')?.textContent || overallOee.toFixed(1) + '%';
+  }
+
   /* ==========================================================================
      UI RENDERERS & KPI CALCULATIONS
      ========================================================================== */
@@ -1243,6 +1300,7 @@ if (shareBtn) {
     console.log('Calculated OEE:', overallOee.toFixed(1) + '%');
 
     updateDebugDiagnosticsPanel(logs);
+    updateDataReconciliationPanel(logs);
     updateHammerLogCountBadges();
     renderOverviewKpis(logs);
     renderHammerGauges(logs);
