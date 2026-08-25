@@ -3372,6 +3372,121 @@ if (reloadSampleDataBtn) {
   /* ==========================================================================
      EVENT LISTENERS & TAB NAVIGATION
      ========================================================================== */
+  async function migrateLocalLogsToSupabase() {
+    if (!supabaseClient) {
+        showToast('Supabase is not connected. Please check DB Config.', 'danger');
+        return;
+    }
+
+    if (!Array.isArray(shiftLogs) || shiftLogs.length === 0) {
+        showToast('No local shift log data available to migrate.', 'warning');
+        return;
+    }
+
+    const userId =
+        currentAuthUser?.id ||
+        currentUserProfile?.id ||
+        'migration';
+
+    try {
+        showToast(`Migrating ${shiftLogs.length} local records to Supabase...`, 'info');
+
+        const productionRows = shiftLogs.map(r => ({
+            date: r.date,
+            shift: r.shift,
+            hammer: r.machine,
+            part_number: r.partNumber,
+            planned_time_mins: Number(r.plannedTimeMins || 0),
+            planned_qty: Number(r.totalParts || 0),
+            production_qty: Number(r.totalParts || 0),
+            good_qty: Number(r.goodParts || 0),
+            created_by: userId
+        }));
+
+        if (productionRows.length) {
+            const { error } = await supabaseClient
+                .from('production_data')
+                .insert(productionRows);
+
+            if (error) throw error;
+        }
+
+        const qualityRows = shiftLogs.map(r => ({
+            date: r.date,
+            shift: r.shift,
+            hammer: r.machine,
+            part_number: r.partNumber,
+            inspection_stage: 'In-Process',
+            inspection_qty: Number(r.totalParts || 0),
+            rework_qty: Number(r.rework || 0),
+            rejection_qty: Number(r.rejects || 0),
+            created_by: userId
+        }));
+
+        if (qualityRows.length) {
+            const { error } = await supabaseClient
+                .from('quality_data')
+                .insert(qualityRows);
+
+            if (error) throw error;
+        }
+
+        const downtimeRows = [];
+
+        shiftLogs.forEach(r => {
+            [
+                ['Die Related', r.dieRelatedMins],
+                ['Setup', r.setupMins],
+                ['No Manpower', r.noManpowerMins],
+                ['Heating Time', r.heatingTimeMins],
+                ['Minor Stop', r.minorStopMins]
+            ].forEach(([category, mins]) => {
+                const minutes = Number(mins || 0);
+
+                if (minutes > 0) {
+                    downtimeRows.push({
+                        date: r.date,
+                        shift: r.shift,
+                        hammer: r.machine,
+                        part_number: r.partNumber,
+                        downtime_category: category,
+                        downtime_minutes: minutes,
+                        created_by: userId
+                    });
+                }
+            });
+        });
+
+        if (downtimeRows.length) {
+            const { error } = await supabaseClient
+                .from('downtime_data')
+                .insert(downtimeRows);
+
+            if (error) throw error;
+        }
+
+        console.log('Migration completed:', {
+            production: productionRows.length,
+            quality: qualityRows.length,
+            downtime: downtimeRows.length
+        });
+
+        showToast(
+            `Migration successful! Production: ${productionRows.length}, Quality: ${qualityRows.length}, Downtime: ${downtimeRows.length}`,
+            'success'
+        );
+
+        await fetchSupabaseShiftLogs();
+        renderAllViews();
+
+    } catch (error) {
+        console.error('SUPABASE MIGRATION ERROR:', error);
+        showToast(`Migration failed: ${error.message}`, 'danger');
+    }
+}
+
+
+function setupEventListeners() {
   function setupEventListeners() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
