@@ -102,8 +102,12 @@ if (shareBtn) {
     return num;
   }
 
-  function formatExcelDate(rawVal) {
-    if (!rawVal) return new Date().toISOString().split('T')[0];
+  function getStandardDateString(rawVal) {
+    if (!rawVal) return '';
+    if (rawVal instanceof Date) {
+      if (isNaN(rawVal.getTime())) return '';
+      return rawVal.toISOString().split('T')[0];
+    }
 
     // Excel Serial Number (e.g. 45500)
     if (typeof rawVal === 'number' && rawVal > 30000 && rawVal < 60000) {
@@ -114,23 +118,23 @@ if (shareBtn) {
     }
 
     const str = String(rawVal).trim();
-    if (!str) return new Date().toISOString().split('T')[0];
+    if (!str) return '';
 
-    // Match DD/MM/YYYY or DD-MM-YYYY
-    const dmyMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
-    if (dmyMatch) {
-      const day = dmyMatch[1].padStart(2, '0');
-      const month = dmyMatch[2].padStart(2, '0');
-      const year = dmyMatch[3];
-      return `${year}-${month}-${day}`;
-    }
-
-    // Match YYYY-MM-DD
-    const ymdMatch = str.match(/^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})$/);
+    // Match ISO timestamp or YYYY-MM-DD (e.g. 2026-08-15T08:30:00 or 2026-08-15)
+    const ymdMatch = str.match(/^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})/);
     if (ymdMatch) {
       const year = ymdMatch[1];
       const month = ymdMatch[2].padStart(2, '0');
       const day = ymdMatch[3].padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Match DD/MM/YYYY or DD-MM-YYYY
+    const dmyMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);
+    if (dmyMatch) {
+      const day = dmyMatch[1].padStart(2, '0');
+      const month = dmyMatch[2].padStart(2, '0');
+      const year = dmyMatch[3];
       return `${year}-${month}-${day}`;
     }
 
@@ -139,7 +143,20 @@ if (shareBtn) {
       return parsedDate.toISOString().split('T')[0];
     }
 
-    return new Date().toISOString().split('T')[0];
+    return str;
+  }
+
+  function getYearMonthString(rawVal) {
+    const std = getStandardDateString(rawVal);
+    if (std && std.length >= 7) {
+      return std.substring(0, 7); // e.g. "2026-08"
+    }
+    return '';
+  }
+
+  function formatExcelDate(rawVal) {
+    const std = getStandardDateString(rawVal);
+    return std || new Date().toISOString().split('T')[0];
   }
 
   function normalizeKey(str) {
@@ -1027,14 +1044,23 @@ if (shareBtn) {
 
     return shiftLogs.filter(log => {
       // 1. Machine / Hammer filter
-      if (hammerFilter !== 'ALL' && log.machine !== hammerFilter) return false;
+      if (hammerFilter !== 'ALL') {
+        const normLogHammer = normalizeHammerName(log.machine);
+        const normSelectedHammer = normalizeHammerName(hammerFilter);
+        if (normLogHammer !== normSelectedHammer) return false;
+      }
 
       // 2. Shift filter
-      if (shiftFilter !== 'ALL' && log.shift !== shiftFilter) return false;
+      if (shiftFilter !== 'ALL') {
+        if (!log.shift || log.shift.trim().toLowerCase() !== shiftFilter.trim().toLowerCase()) {
+          return false;
+        }
+      }
 
       // 3. Month filter (YYYY-MM)
       if (monthFilter !== 'ALL') {
-        if (!log.date || !log.date.startsWith(monthFilter)) return false;
+        const logYearMonth = getYearMonthString(log.date);
+        if (logYearMonth !== monthFilter) return false;
       }
 
       return true;
