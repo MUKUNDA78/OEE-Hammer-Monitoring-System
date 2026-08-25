@@ -3183,8 +3183,13 @@ if (reloadSampleDataBtn) {
           created_by: userId
         }));
 
-        const { error: prodErr } = await supabaseClient.from('production_data').insert(prodRows);
-        if (prodErr) throw prodErr;
+        const batchSize = 50;
+
+        for (let i = 0; i < prodRows.length; i += batchSize) {
+          const chunk = prodRows.slice(i, i + batchSize);
+          const { error: prodErr } = await supabaseClient.from('production_data').insert(chunk);
+          if (prodErr) throw prodErr;
+        }
 
         const qualRows = excelValidNewRecords.map(r => ({
           date: r.date,
@@ -3198,7 +3203,11 @@ if (reloadSampleDataBtn) {
           created_by: userId
         }));
 
-        await supabaseClient.from('quality_data').insert(qualRows);
+        for (let i = 0; i < qualRows.length; i += batchSize) {
+          const chunk = qualRows.slice(i, i + batchSize);
+          const { error: qualErr } = await supabaseClient.from('quality_data').insert(chunk);
+          if (qualErr) throw qualErr;
+        }
 
         showToast(`Successfully inserted ${excelValidNewRecords.length} records into Supabase!`, 'success');
         document.getElementById('excelPreviewCard').style.display = 'none';
