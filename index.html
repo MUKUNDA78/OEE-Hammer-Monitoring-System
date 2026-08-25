@@ -193,6 +193,34 @@
     <!-- Main Content Body -->
     <main class="content-body">
 
+      <!-- Visible On-Screen Debug Diagnostics Panel (Step 2 Mandatory Requirement) -->
+      <div id="liveDebugPanel" style="background: rgba(15, 23, 42, 0.95); color: #00ff88; font-family: monospace; font-size: 11px; padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #16a34a; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div style="font-weight: 700; font-size: 13px; color: #38bdf8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+          <span>🔍 RUNTIME DATA FLOW & FILTER DIAGNOSTICS</span>
+          <span id="dbgSupabaseConnected" style="background: #16a34a; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Supabase Connected: YES</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px;">
+          <div>Raw Records Loaded: <strong id="dbgRawRecords" style="color:#fff;">0</strong></div>
+          <div>Selected Machine: <strong id="dbgSelMachine" style="color:#38bdf8;">ALL</strong></div>
+          <div>Selected Month: <strong id="dbgSelMonth" style="color:#38bdf8;">ALL</strong></div>
+          <div>Selected Shift: <strong id="dbgSelShift" style="color:#38bdf8;">ALL</strong></div>
+          <div>Filtered Records: <strong id="dbgFilteredRecords" style="color:#facc15; font-size: 13px;">0</strong></div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px; margin-bottom: 8px; font-size: 10px;">
+          <div>Available DB Months: <span id="dbgDbMonths" style="color: #a7f3d0;">None</span></div>
+          <div>Unique DB Machines: <span id="dbgDbMachines" style="color: #a7f3d0;">None</span></div>
+          <div>First 5 DB Dates: <span id="dbgDbDates" style="color: #a7f3d0;">None</span></div>
+        </div>
+        <div style="margin-bottom: 6px; font-size: 11px; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px;">
+          <strong>KPI Input Record Counts:</strong>
+          OEE (<span id="dbgOeeCnt">0</span> recs) = <strong id="dbgOeeVal" style="color:#38bdf8;">0.0%</strong> |
+          Avail (<span id="dbgAvailCnt">0</span> recs) = <strong id="dbgAvailVal" style="color:#38bdf8;">0.0%</strong> |
+          Perf (<span id="dbgPerfCnt">0</span> recs) = <strong id="dbgPerfVal" style="color:#38bdf8;">0.0%</strong> |
+          Qual (<span id="dbgQualCnt">0</span> recs) = <strong id="dbgQualVal" style="color:#38bdf8;">0.0%</strong>
+        </div>
+        <div>First Filtered Record: <pre id="dbgFirstRecord" style="margin:4px 0 0 0; font-size:10px; max-height:75px; overflow:auto; color:#cbd5e1; background:rgba(0,0,0,0.6); padding:6px; border-radius:4px; white-space: pre-wrap;">None</pre></div>
+      </div>
+
       <!-- TAB 1: OVERVIEW -->
       <section class="tab-content active" id="tab-overview">
         

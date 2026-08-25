@@ -884,9 +884,9 @@ if (shareBtn) {
     const pill = document.getElementById('cloudDbStatusPill');
 
     Promise.all([
-      supabaseClient.from('production_data').select('*').eq('is_deleted', false),
-      supabaseClient.from('quality_data').select('*').eq('is_deleted', false),
-      supabaseClient.from('downtime_data').select('*').eq('is_deleted', false)
+      supabaseClient.from('production_data').select('*').eq('is_deleted', false).limit(50000),
+      supabaseClient.from('quality_data').select('*').eq('is_deleted', false).limit(50000),
+      supabaseClient.from('downtime_data').select('*').eq('is_deleted', false).limit(50000)
     ]).then(([prodRes, qualRes, downRes]) => {
       if (prodRes.error) throw prodRes.error;
       if (qualRes.error) throw qualRes.error;
@@ -997,14 +997,12 @@ if (shareBtn) {
 
     const monthSet = new Set();
     shiftLogs.forEach(l => {
-      if (l.date && l.date.length >= 7) {
-        monthSet.add(l.date.substring(0, 7));
-      }
+      const ym = getYearMonthString(l.date);
+      if (ym) monthSet.add(ym);
     });
     qualityLogs.forEach(q => {
-      if (q.date && q.date.length >= 7) {
-        monthSet.add(q.date.substring(0, 7));
-      }
+      const ym = getYearMonthString(q.date);
+      if (ym) monthSet.add(ym);
     });
 
     const sortedMonths = Array.from(monthSet).sort().reverse();
@@ -1023,7 +1021,6 @@ if (shareBtn) {
       html += `<option value="${m}">${formatMonthLabel(m)}</option>`;
     });
 
-    // Only update innerHTML if options list changed to avoid resetting user selection during interaction
     const existingValues = Array.from(select.options).map(o => o.value).join(',');
     const newValues = ['ALL', ...sortedMonths].join(',');
 
@@ -1065,6 +1062,89 @@ if (shareBtn) {
 
       return true;
     });
+  }
+
+  function updateDebugDiagnosticsPanel(filteredLogs) {
+    const rawEl = document.getElementById('dbgRawRecords');
+    const selMachEl = document.getElementById('dbgSelMachine');
+    const selMonthEl = document.getElementById('dbgSelMonth');
+    const selShiftEl = document.getElementById('dbgSelShift');
+    const filtEl = document.getElementById('dbgFilteredRecords');
+    const dbMonthsEl = document.getElementById('dbgDbMonths');
+    const dbMachinesEl = document.getElementById('dbgDbMachines');
+    const dbDatesEl = document.getElementById('dbgDbDates');
+
+    const oeeCnt = document.getElementById('dbgOeeCnt');
+    const oeeVal = document.getElementById('dbgOeeVal');
+    const availCnt = document.getElementById('dbgAvailCnt');
+    const availVal = document.getElementById('dbgAvailVal');
+    const perfCnt = document.getElementById('dbgPerfCnt');
+    const perfVal = document.getElementById('dbgPerfVal');
+    const qualCnt = document.getElementById('dbgQualCnt');
+    const qualVal = document.getElementById('dbgQualVal');
+
+    const firstRec = document.getElementById('dbgFirstRecord');
+
+    if (rawEl) rawEl.textContent = shiftLogs.length;
+
+    const hVal = document.getElementById('globalHammerFilter')?.value || 'ALL';
+    const sVal = document.getElementById('globalShiftFilter')?.value || 'ALL';
+    const mVal = document.getElementById('globalRangeFilter')?.value || 'ALL';
+
+    if (selMachEl) selMachEl.textContent = hVal;
+    if (selMonthEl) selMonthEl.textContent = mVal;
+    if (selShiftEl) selShiftEl.textContent = sVal;
+    if (filtEl) filtEl.textContent = filteredLogs.length;
+
+    const uniqueMonths = Array.from(new Set(shiftLogs.map(l => getYearMonthString(l.date)).filter(Boolean))).sort();
+    const uniqueMachines = Array.from(new Set(shiftLogs.map(l => l.machine).filter(Boolean))).sort();
+    const firstDates = Array.from(new Set(shiftLogs.map(l => getStandardDateString(l.date)).filter(Boolean))).slice(0, 5);
+
+    if (dbMonthsEl) dbMonthsEl.textContent = uniqueMonths.join(', ') || 'None';
+    if (dbMachinesEl) dbMachinesEl.textContent = uniqueMachines.join(', ') || 'None';
+    if (dbDatesEl) dbDatesEl.textContent = firstDates.join(', ') || 'None';
+
+    let totalPlannedMins = 0, totalOperatingMins = 0, totalIdealMins = 0, totalProduced = 0, totalGood = 0;
+
+    filteredLogs.forEach(l => {
+      totalPlannedMins += parseNum(l.plannedTimeMins, 660);
+      totalOperatingMins += parseNum(l.operatingTimeMins);
+      totalIdealMins += Math.min(parseNum(l.operatingTimeMins), (parseNum(l.totalParts) * parseNum(l.idealCycleSec, 45)) / 60);
+      totalProduced += parseNum(l.totalParts);
+      totalGood += parseNum(l.goodParts);
+    });
+
+    const avgAvail = totalPlannedMins > 0 ? (totalOperatingMins / totalPlannedMins) * 100 : 0;
+    const avgPerf = totalOperatingMins > 0 ? Math.min(100, (totalIdealMins / totalOperatingMins) * 100) : 0;
+    const avgQual = totalProduced > 0 ? (totalGood / totalProduced) * 100 : 100;
+    const overallOee = (avgAvail / 100) * (avgPerf / 100) * (avgQual / 100) * 100;
+
+    if (oeeCnt) oeeCnt.textContent = filteredLogs.length;
+    if (oeeVal) oeeVal.textContent = overallOee.toFixed(1) + '%';
+    if (availCnt) availCnt.textContent = filteredLogs.length;
+    if (availVal) availVal.textContent = avgAvail.toFixed(1) + '%';
+    if (perfCnt) perfCnt.textContent = filteredLogs.length;
+    if (perfVal) perfVal.textContent = avgPerf.toFixed(1) + '%';
+    if (qualCnt) qualCnt.textContent = filteredLogs.length;
+    if (qualVal) qualVal.textContent = avgQual.toFixed(1) + '%';
+
+    if (firstRec) {
+      if (filteredLogs.length > 0) {
+        const sample = {
+          date: filteredLogs[0].date,
+          shift: filteredLogs[0].shift,
+          machine: filteredLogs[0].machine,
+          partNumber: filteredLogs[0].partNumber,
+          plannedTimeMins: filteredLogs[0].plannedTimeMins,
+          totalParts: filteredLogs[0].totalParts,
+          goodParts: filteredLogs[0].goodParts,
+          oee: filteredLogs[0].oee + '%'
+        };
+        firstRec.textContent = JSON.stringify(sample, null, 2);
+      } else {
+        firstRec.textContent = 'None (0 records match selected filters)';
+      }
+    }
   }
 
   /* ==========================================================================
@@ -1109,6 +1189,7 @@ if (shareBtn) {
     console.log('Calculated Quality:', avgQual.toFixed(1) + '%');
     console.log('Calculated OEE:', overallOee.toFixed(1) + '%');
 
+    updateDebugDiagnosticsPanel(logs);
     updateHammerLogCountBadges();
     renderOverviewKpis(logs);
     renderHammerGauges(logs);
