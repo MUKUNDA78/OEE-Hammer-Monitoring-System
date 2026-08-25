@@ -3487,7 +3487,11 @@ if (reloadSampleDataBtn) {
 
 
 function setupEventListeners() {
-  function setupEventListeners() {
+     const migrateBtn = document.getElementById('restoreBackupLogsBtn');
+
+    if (migrateBtn) {
+        migrateBtn.addEventListener('click', migrateLocalLogsToSupabase);
+    }
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         const targetTab = tab.getAttribute('data-tab');
