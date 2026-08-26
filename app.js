@@ -227,6 +227,20 @@ if (shareBtn) {
   /* ==========================================================================
      OEE MATHEMATICAL CALCULATIONS ENGINE
      ========================================================================== */
+  function getMachineIdealCycleSec(machineName, storedCycle) {
+    const hammerObj = HAMMERS.find(h => normalizeHammerName(h.name) === normalizeHammerName(machineName));
+    const defaultSec = hammerObj ? hammerObj.defaultCycle : 45;
+
+    let cycle = parseNum(storedCycle, 0);
+    if (cycle <= 0 || cycle === 45) {
+      return defaultSec;
+    }
+    if (cycle < 3) cycle = cycle * 60;
+    else if (cycle > 300) cycle = 3600 / cycle;
+
+    return cycle;
+  }
+
   function calculateOeeRecord(data) {
     let grossShiftMins = parseNum(data.grossShiftMins, 720);
     if (grossShiftMins > 0 && grossShiftMins <= 24) {
@@ -285,17 +299,7 @@ if (shareBtn) {
       goodParts = Math.max(0, totalParts - rejects);
     }
 
-    let idealCycleSec = parseNum(data.idealCycleSec, 0);
-    if (idealCycleSec <= 0) {
-      const hammerObj = HAMMERS.find(h => h.name === data.machine);
-      idealCycleSec = hammerObj ? hammerObj.defaultCycle : 45;
-    } else if (idealCycleSec < 3) {
-      // Specified in minutes per piece (e.g. 0.75 min) => convert to seconds (0.75 * 60 = 45 sec)
-      idealCycleSec = idealCycleSec * 60;
-    } else if (idealCycleSec > 300) {
-      // Specified in parts per hour (e.g. 80 pcs/hr) => convert to sec/pc (3600 / 80 = 45 sec)
-      idealCycleSec = 3600 / idealCycleSec;
-    }
+    let idealCycleSec = getMachineIdealCycleSec(data.machine, data.idealCycleSec);
 
     // 1. Availability Rate (A = Operating Time / Net Planned Time)
     const availability = netPlannedTimeMins > 0 ? Math.min(100.0, Math.max(0, (operatingTime / netPlannedTimeMins) * 100)) : 0;
@@ -1167,7 +1171,7 @@ if (shareBtn) {
       s.parts.forEach(p => {
         totalPcs += parseNum(p.totalParts);
         goodPcs += parseNum(p.goodParts);
-        idealMins += (parseNum(p.totalParts) * parseNum(p.idealCycleSec, 45)) / 60;
+        idealMins += (parseNum(p.totalParts) * getMachineIdealCycleSec(p.machine, p.idealCycleSec)) / 60;
       });
     });
 
@@ -1250,7 +1254,7 @@ if (shareBtn) {
     filteredLogs.forEach(l => {
       totalPlannedMins += parseNum(l.plannedTimeMins, 660);
       totalOperatingMins += parseNum(l.operatingTimeMins);
-      totalIdealMins += Math.min(parseNum(l.operatingTimeMins), (parseNum(l.totalParts) * parseNum(l.idealCycleSec, 45)) / 60);
+      totalIdealMins += Math.min(parseNum(l.operatingTimeMins), (parseNum(l.totalParts) * getMachineIdealCycleSec(l.machine, l.idealCycleSec)) / 60);
       totalProduced += parseNum(l.totalParts);
       totalGood += parseNum(l.goodParts);
     });
@@ -3414,7 +3418,7 @@ if (reloadSampleDataBtn) {
         pMins += parseNum(l.plannedTimeMins, 0);
         oMins += parseNum(l.operatingTimeMins, 0);
         downtime += parseNum(l.totalDowntimeMins, 0);
-        iMins += (parseNum(l.totalParts, 0) * parseNum(l.idealCycleSec, 45)) / 60;
+        iMins += (parseNum(l.totalParts, 0) * getMachineIdealCycleSec(h.name, l.idealCycleSec)) / 60;
         totalPcs += parseNum(l.totalParts, 0);
         goodPcs += parseNum(l.goodParts, 0);
         rejects += parseNum(l.rejects, 0);
