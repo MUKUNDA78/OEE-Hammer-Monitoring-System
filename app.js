@@ -2823,12 +2823,16 @@ if (shareBtn) {
       });
     }
 
-    document.getElementById('downloadXlsxTemplateBtn').addEventListener('click', downloadExcelTemplate);
-    document.getElementById('downloadCsvTemplateBtn').addEventListener('click', downloadCsvTemplate);
+    const safeAddListener = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    };
 
-    document.getElementById('exportFullExcelBtn').addEventListener('click', exportFullLogsExcel);
-    document.getElementById('exportSummaryExcelBtn').addEventListener('click', exportSummaryExcel);
-    document.getElementById('exportLogsCsvBtn').addEventListener('click', exportLogsCsv);
+    safeAddListener('downloadXlsxTemplateBtn', downloadExcelTemplate);
+    safeAddListener('downloadCsvTemplateBtn', downloadCsvTemplate);
+    safeAddListener('exportFullExcelBtn', exportFullLogsExcel);
+    safeAddListener('exportSummaryExcelBtn', exportSummaryExcel);
+    safeAddListener('exportLogsCsvBtn', exportLogsCsv);
 
    const reloadSampleDataBtn = document.getElementById('reloadSampleDataBtn');
 
@@ -3348,56 +3352,72 @@ if (reloadSampleDataBtn) {
   }
 
   function exportFullLogsExcel() {
-    const logs = getFilteredLogs();
-    if (logs.length === 0) {
+    let logs = getFilteredLogs();
+    if (!logs || logs.length === 0) logs = shiftLogs;
+    if (!logs || logs.length === 0) {
       showToast('No logs available to export.', 'warning');
       return;
     }
 
     const exportRows = logs.map(l => ({
-      "Date": l.date,
-      "Shift": l.shift,
-      "Machine": l.machine,
-      "part number": l.partNumber,
-      "Planned time": l.plannedTimeMins,
-      "Maintance": l.maintanceMins,
-      "die related": l.dieRelatedMins,
-      "setup": l.setupMins,
-      "No manpower": l.noManpowerMins,
-      "Heating time": l.heatingTimeMins,
-      "minor stop": l.minorStopMins,
-      "total downtime": l.totalDowntimeMins,
-      "operating time": l.operatingTimeMins,
-      "total parts": l.totalParts,
-      "good parts": l.goodParts,
-      "rejects": l.rejects,
-      "ideal cycle time": l.idealCycleSec,
-      "Availability": l.availability,
-      "Performance": l.performance,
-      "Quality": l.quality,
-      "OEE": l.oee
+      "Date": l.date || '',
+      "Shift": l.shift || 'Shift A',
+      "Machine": l.machine || '1 Ton Hammer',
+      "part number": l.partNumber || 'N/A',
+      "Planned time": parseNum(l.plannedTimeMins, 660),
+      "Maintance": parseNum(l.maintanceMins, 0),
+      "die related": parseNum(l.dieRelatedMins, 0),
+      "setup": parseNum(l.setupMins, 0),
+      "No manpower": parseNum(l.noManpowerMins, 0),
+      "Heating time": parseNum(l.heatingTimeMins, 0),
+      "minor stop": parseNum(l.minorStopMins, 0),
+      "total downtime": parseNum(l.totalDowntimeMins, 0),
+      "operating time": parseNum(l.operatingTimeMins, 0),
+      "total parts": parseNum(l.totalParts, 0),
+      "good parts": parseNum(l.goodParts, 0),
+      "rejects": parseNum(l.rejects, 0),
+      "ideal cycle time": parseNum(l.idealCycleSec, 45),
+      "Availability": l.availability || 0,
+      "Performance": l.performance || 0,
+      "Quality": l.quality || 0,
+      "OEE": l.oee || 0
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Machine_Shift_Logs");
-    XLSX.writeFile(wb, `Forge_Machine_Shift_Logs_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const filename = `Forge_Machine_Shift_Logs_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    if (typeof XLSX !== 'undefined' && XLSX.utils && XLSX.writeFile) {
+      try {
+        const ws = XLSX.utils.json_to_sheet(exportRows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Machine_Shift_Logs");
+        XLSX.writeFile(wb, filename);
+        showToast('Successfully exported Excel sheet!', 'success');
+        return;
+      } catch (err) {
+        console.warn('XLSX export failed, falling back to CSV export:', err);
+      }
+    }
+
+    // CSV Fallback
+    exportLogsCsv();
   }
 
   function exportSummaryExcel() {
-    const logs = getFilteredLogs();
+    let logs = getFilteredLogs();
+    if (!logs || logs.length === 0) logs = shiftLogs;
+
     const summaryRows = HAMMERS.map(h => {
       const hLogs = logs.filter(l => l.machine === h.name);
       let pMins = 0, oMins = 0, iMins = 0, downtime = 0, totalPcs = 0, goodPcs = 0, rejects = 0;
 
       hLogs.forEach(l => {
-        pMins += l.plannedTimeMins;
-        oMins += l.operatingTimeMins;
-        downtime += l.totalDowntimeMins;
-        iMins += (l.totalParts * l.idealCycleSec) / 60;
-        totalPcs += l.totalParts;
-        goodPcs += l.goodParts;
-        rejects += l.rejects;
+        pMins += parseNum(l.plannedTimeMins, 0);
+        oMins += parseNum(l.operatingTimeMins, 0);
+        downtime += parseNum(l.totalDowntimeMins, 0);
+        iMins += (parseNum(l.totalParts, 0) * parseNum(l.idealCycleSec, 45)) / 60;
+        totalPcs += parseNum(l.totalParts, 0);
+        goodPcs += parseNum(l.goodParts, 0);
+        rejects += parseNum(l.rejects, 0);
       });
 
       const avail = pMins > 0 ? (oMins / pMins) * 100 : 0;
@@ -3422,19 +3442,43 @@ if (reloadSampleDataBtn) {
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(summaryRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "5_Machine_Summary");
-    XLSX.writeFile(wb, `5_Machine_OEE_Summary_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const filename = `5_Machine_OEE_Summary_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    if (typeof XLSX !== 'undefined' && XLSX.utils && XLSX.writeFile) {
+      try {
+        const ws = XLSX.utils.json_to_sheet(summaryRows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "5_Machine_Summary");
+        XLSX.writeFile(wb, filename);
+        showToast('Successfully exported summary Excel sheet!', 'success');
+        return;
+      } catch (err) {
+        console.warn('XLSX summary export failed, falling back to CSV export:', err);
+      }
+    }
+
+    // CSV Fallback for Summary
+    let csv = "Machine / Hammer,Capacity,Shift Count,Net Planned Hrs,Operating Hrs,Downtime Hrs,Total Parts,Good Parts,Rejects,Availability (%),Performance (%),Quality (%),Overall OEE (%)\n";
+    summaryRows.forEach(r => {
+      csv += `"${r['Machine / Hammer']}","${r['Capacity']}",${r['Shift Count']},${r['Net Planned Hrs']},${r['Operating Hrs']},${r['Downtime Hrs']},${r['Total Parts']},${r['Good Parts']},${r['Rejects']},${r['Availability (%)']},${r['Performance (%)']},${r['Quality (%)']},${r['Overall OEE (%)']}\n`;
+    });
+    downloadFile(csv, filename.replace('.xlsx', '.csv'), "text/csv");
   }
 
   function exportLogsCsv() {
-    const logs = getFilteredLogs();
+    let logs = getFilteredLogs();
+    if (!logs || logs.length === 0) logs = shiftLogs;
+    if (!logs || logs.length === 0) {
+      showToast('No logs available to export.', 'warning');
+      return;
+    }
+
     let csv = "Date,Shift,Machine,part number,Planned time,Maintance,die related,setup,No manpower,Heating time,minor stop,total downtime,operating time,total parts,good parts,rejects,ideal cycle time,Availability,Performance,Quality,OEE\n";
     logs.forEach(l => {
-      csv += `${l.date},${l.shift},"${l.machine}","${l.partNumber}",${l.plannedTimeMins},${l.maintanceMins},${l.dieRelatedMins},${l.setupMins},${l.noManpowerMins},${l.heatingTimeMins},${l.minorStopMins},${l.totalDowntimeMins},${l.operatingTimeMins},${l.totalParts},${l.goodParts},${l.rejects},${l.idealCycleSec},${l.availability},${l.performance},${l.quality},${l.oee}\n`;
+      csv += `${l.date || ''},${l.shift || 'Shift A'},"${l.machine || ''}","${l.partNumber || ''}",${parseNum(l.plannedTimeMins, 660)},${parseNum(l.maintanceMins, 0)},${parseNum(l.dieRelatedMins, 0)},${parseNum(l.setupMins, 0)},${parseNum(l.noManpowerMins, 0)},${parseNum(l.heatingTimeMins, 0)},${parseNum(l.minorStopMins, 0)},${parseNum(l.totalDowntimeMins, 0)},${parseNum(l.operatingTimeMins, 0)},${parseNum(l.totalParts, 0)},${parseNum(l.goodParts, 0)},${parseNum(l.rejects, 0)},${parseNum(l.idealCycleSec, 45)},${l.availability || 0},${l.performance || 0},${l.quality || 0},${l.oee || 0}\n`;
     });
     downloadFile(csv, `Machine_Shift_Logs_${new Date().toISOString().split('T')[0]}.csv`, "text/csv");
+    showToast('Exported CSV file successfully!', 'success');
   }
 
   function downloadFile(content, fileName, mimeType) {
@@ -3443,9 +3487,18 @@ if (reloadSampleDataBtn) {
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  // Expose export functions to global window object
+  window.exportFullLogsExcel = exportFullLogsExcel;
+  window.exportSummaryExcel = exportSummaryExcel;
+  window.exportLogsCsv = exportLogsCsv;
+  window.downloadExcelTemplate = downloadExcelTemplate;
+  window.downloadCsvTemplate = downloadCsvTemplate;
 
   /* ==========================================================================
      TAB 7: MASTER SHIFT LOGS TABLE RENDERER

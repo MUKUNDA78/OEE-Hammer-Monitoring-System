@@ -1315,21 +1315,17 @@
               <button class="btn btn-primary" onclick="document.getElementById('excelFileInput').click()">
                 <i class="fa-solid fa-folder-open"></i> Browse Combined Excel File
               </button>
-            </div>
-
-            <div class="template-download-box mt-3">
-              <div class="template-info">
-                <i class="fa-solid fa-file-csv icon-csv"></i>
-                <div>
-                  <strong>Combined Fleet Standard Template (2 x 12h | 60m Breaks)</strong>
-                  <p>Pre-configured for 12h shifts with 60m planned breaks (30m Lunch + 30m Tea) => Net 660m Planned Time.</p>
-                </div>
+              <div class="template-download-box mt-3">
+              <i class="fa-solid fa-file-csv icon-csv"></i>
+              <div>
+                <h5>Download Standard Excel / CSV Import Templates</h5>
+                <p>Download pre-formatted 12-hour shift (Net 660 mins) templates matching Unit 1 standards.</p>
               </div>
-              <div class="template-buttons">
-                <button class="btn btn-outline btn-sm" id="downloadXlsxTemplateBtn">
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline btn-sm" id="downloadXlsxTemplateBtn" onclick="downloadExcelTemplate()">
                   <i class="fa-solid fa-download"></i> Fleet Template (.xlsx)
                 </button>
-                <button class="btn btn-outline btn-sm" id="downloadCsvTemplateBtn">
+                <button class="btn btn-outline btn-sm" id="downloadCsvTemplateBtn" onclick="downloadCsvTemplate()">
                   <i class="fa-solid fa-download"></i> CSV Template (.csv)
                 </button>
               </div>
@@ -1337,11 +1333,10 @@
           </div>
 
           <!-- Export & Backup Options Card -->
-          <div class="card">
-            <div class="card-header">
-              <h3><i class="fa-solid fa-file-export"></i> Export Reports & Logs</h3>
-            </div>
-            
+          <div class="card mt-4">
+            <h3><i class="fa-solid fa-file-export"></i> Export Reports & Logs</h3>
+            <p style="font-size: 12px; color: var(--text-muted);">Export shift records and hammer performance summaries directly to Excel (.xlsx) or CSV format.</p>
+
             <div class="export-options-list">
               <div class="export-item">
                 <div class="export-icon">
@@ -1351,15 +1346,20 @@
                   <h4>Full Shift Logs (Plant Format)</h4>
                   <p>Export all machine shift logs including all 17 plant data columns.</p>
                 </div>
-                <button class="btn btn-secondary btn-sm" id="exportFullExcelBtn">
+                <button class="btn btn-secondary btn-sm" id="exportFullExcelBtn" onclick="exportFullLogsExcel()">
                   <i class="fa-solid fa-download"></i> Export Excel
+                </button>
+              </div>
+
+              <div class="export-item">
+                <div class="export-icon">
                   <i class="fa-solid fa-chart-line text-primary"></i>
                 </div>
                 <div class="export-details">
                   <h4>5-Hammer Summary Report</h4>
                   <p>Export aggregated Availability, Performance, Quality, and OEE totals for each hammer.</p>
                 </div>
-                <button class="btn btn-outline btn-sm" id="exportSummaryExcelBtn">
+                <button class="btn btn-outline btn-sm" id="exportSummaryExcelBtn" onclick="exportSummaryExcel()">
                   <i class="fa-solid fa-download"></i> Export Summary
                 </button>
               </div>
@@ -1372,15 +1372,10 @@
                   <h4>CSV Format Backup</h4>
                   <p>Standard comma-separated backup file for legacy databases or ERP systems.</p>
                 </div>
-                <button class="btn btn-outline btn-sm" id="exportLogsCsvBtn">
+                <button class="btn btn-outline btn-sm" id="exportLogsCsvBtn" onclick="exportLogsCsv()">
                   <i class="fa-solid fa-download"></i> Export CSV
                 </button>
               </div>
-
-              <div class="export-item">
-                <div class="export-icon">
-                  <i class="fa-solid fa-rotate-left text-info"></i>
-                </div>
                 <div class="export-details">
                   <h4>Reset / Clear Logs</h4>
                   <p>Clear current logs or reload sample data dataset.</p>
@@ -1494,7 +1489,7 @@
             <h3><i class="fa-solid fa-list-check"></i> Shift Records Master Log</h3>
             <div class="card-search">
               <input type="text" id="logSearchInput" placeholder="Search Machine, Part Number, Shift...">
-              <button class="btn btn-outline btn-sm" id="exportLogsCsvBtn">
+              <button class="btn btn-outline btn-sm" id="exportLogsCsvBtnTable" onclick="exportLogsCsv()">
                 <i class="fa-solid fa-file-csv"></i> Download CSV
               </button>
             </div>
