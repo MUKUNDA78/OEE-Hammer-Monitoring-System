@@ -2693,35 +2693,46 @@ if (shareBtn) {
   }
 
   function calculateLiveFormValues() {
-    const gross = parseNum(document.getElementById('entryGrossPlanned').value, 720);
-    const lunch = parseNum(document.getElementById('entryLunchBreak').value, 30);
-    const tea = parseNum(document.getElementById('entryTeaBreak').value, 30);
+    const getVal = (id, def = 0) => {
+      const el = document.getElementById(id);
+      return el ? el.value : def;
+    };
+
+    const gross = parseNum(getVal('entryGrossPlanned', 720), 720);
+    const lunch = parseNum(getVal('entryLunchBreak', 30), 30);
+    const tea = parseNum(getVal('entryTeaBreak', 30), 30);
     const netPlanned = Math.max(0, gross - lunch - tea);
 
-    document.getElementById('entryPlannedTime').value = netPlanned;
+    const plannedEl = document.getElementById('entryPlannedTime');
+    if (plannedEl) plannedEl.value = netPlanned;
 
     const rawData = {
       grossShiftMins: gross,
       lunchBreakMins: lunch,
       teaBreakMins: tea,
       plannedTimeMins: netPlanned,
-      maintanceMins: document.getElementById('entryMaintance').value,
-      dieRelatedMins: document.getElementById('entryDieRelated').value,
-      setupMins: document.getElementById('entrySetup').value,
-      noManpowerMins: document.getElementById('entryNoManpower').value,
-      heatingTimeMins: document.getElementById('entryHeatingTime').value,
-      minorStopMins: document.getElementById('entryMinorStop').value,
-      idealCycleSec: document.getElementById('entryIdealCycle').value,
-      totalParts: document.getElementById('entryTotalParts').value,
-      rejects: document.getElementById('entryRejects').value
+      maintanceMins: getVal('entryMaintance'),
+      dieRelatedMins: getVal('entryDieRelated'),
+      setupMins: getVal('entrySetup'),
+      noManpowerMins: getVal('entryNoManpower'),
+      heatingTimeMins: getVal('entryHeatingTime'),
+      minorStopMins: getVal('entryMinorStop'),
+      idealCycleSec: getVal('entryIdealCycle'),
+      totalParts: getVal('entryTotalParts'),
+      rejects: getVal('entryRejects')
     };
 
     const res = calculateOeeRecord(rawData);
 
-    document.getElementById('entryGoodParts').value = res.goodParts;
-    document.getElementById('calcTotalDowntime').textContent = `${res.totalDowntimeMins} mins`;
-    document.getElementById('calcOperatingTime').textContent = `${res.operatingTimeMins} mins`;
-    
+    const goodEl = document.getElementById('entryGoodParts');
+    if (goodEl) goodEl.value = res.goodParts;
+
+    const dtEl = document.getElementById('calcTotalDowntime');
+    if (dtEl) dtEl.textContent = `${res.totalDowntimeMins} mins`;
+
+    const opEl = document.getElementById('calcOperatingTime');
+    if (opEl) opEl.textContent = `${res.operatingTimeMins} mins`;
+
     updateCalcElement('calcAvailability', res.availability);
     updateCalcElement('calcPerformance', res.performance);
     updateCalcElement('calcQuality', res.quality);
@@ -2738,19 +2749,24 @@ if (shareBtn) {
   function handleManualFormSubmit(e) {
     e.preventDefault();
 
-    const machine = document.getElementById('entryMachine').value;
-    const date = document.getElementById('entryDate').value;
-    const shift = document.getElementById('entryShift').value;
-    const partNumber = document.getElementById('entryPart').value || 'A1#21';
+    const getVal = (id, def = '') => {
+      const el = document.getElementById(id);
+      return el ? el.value : def;
+    };
+
+    const machine = getVal('entryMachine') || getVal('entryHammer');
+    const date = getVal('entryDate');
+    const shift = getVal('entryShift', 'Shift A');
+    const partNumber = getVal('entryPart') || getVal('entryPartNumber') || 'A1#21';
 
     if (!machine || !date) {
       showToast('Please select Machine and Date.', 'danger');
       return;
     }
 
-    const gross = parseNum(document.getElementById('entryGrossPlanned').value, 720);
-    const lunch = parseNum(document.getElementById('entryLunchBreak').value, 30);
-    const tea = parseNum(document.getElementById('entryTeaBreak').value, 30);
+    const gross = parseNum(getVal('entryGrossPlanned', 720), 720);
+    const lunch = parseNum(getVal('entryLunchBreak', 30), 30);
+    const tea = parseNum(getVal('entryTeaBreak', 30), 30);
 
     const rawRecord = {
       id: 'LOG-' + Math.random().toString(36).substr(2, 8).toUpperCase(),
@@ -2762,15 +2778,15 @@ if (shareBtn) {
       lunchBreakMins: lunch,
       teaBreakMins: tea,
       plannedTimeMins: Math.max(0, gross - lunch - tea),
-      maintanceMins: parseNum(document.getElementById('entryMaintance').value, 0),
-      dieRelatedMins: parseNum(document.getElementById('entryDieRelated').value, 0),
-      setupMins: parseNum(document.getElementById('entrySetup').value, 0),
-      noManpowerMins: parseNum(document.getElementById('entryNoManpower').value, 0),
-      heatingTimeMins: parseNum(document.getElementById('entryHeatingTime').value, 0),
-      minorStopMins: parseNum(document.getElementById('entryMinorStop').value, 0),
-      totalParts: parseNum(document.getElementById('entryTotalParts').value, 0),
-      rejects: parseNum(document.getElementById('entryRejects').value, 0),
-      idealCycleSec: parseNum(document.getElementById('entryIdealCycle').value, 45)
+      maintanceMins: parseNum(getVal('entryMaintance', 0), 0),
+      dieRelatedMins: parseNum(getVal('entryDieRelated', 0), 0),
+      setupMins: parseNum(getVal('entrySetup', 0), 0),
+      noManpowerMins: parseNum(getVal('entryNoManpower', 0), 0),
+      heatingTimeMins: parseNum(getVal('entryHeatingTime', 0), 0),
+      minorStopMins: parseNum(getVal('entryMinorStop', 0), 0),
+      totalParts: parseNum(getVal('entryTotalParts', 0), 0),
+      rejects: parseNum(getVal('entryRejects', 0), 0),
+      idealCycleSec: parseNum(getVal('entryIdealCycle', 45), 45)
     };
 
     const computed = calculateOeeRecord(rawRecord);
@@ -2779,7 +2795,7 @@ if (shareBtn) {
     saveShiftLogs();
 
     showToast(`Shift record saved for ${machine}! OEE: ${computed.oee}%`, 'success');
-    
+
     renderAllViews();
     switchTab('overview');
   }
@@ -2856,12 +2872,12 @@ if (reloadSampleDataBtn) {
       showToast('All data cleared 100%! Ready for your Excel uploads.', 'warning');
     };
 
-    document.getElementById('clearAllLogsBtn').addEventListener('click', () => {
+    safeAddListener('clearAllLogsBtn', () => {
       if (confirm('Clear all log data and start completely fresh for your Excel uploads?')) {
         clearAllLogsAction();
       }
     });
-    
+
     const clearDemoHeaderBtn = document.getElementById('clearDemoDataHeaderBtn');
     if (clearDemoHeaderBtn) {
       clearDemoHeaderBtn.addEventListener('click', () => {
@@ -2871,13 +2887,14 @@ if (reloadSampleDataBtn) {
       });
     }
 
-    document.getElementById('commitExcelImportBtn').addEventListener('click', () => {
+    safeAddListener('commitExcelImportBtn', () => {
       showToast('Excel shift logs are active!', 'success');
       switchTab('overview');
     });
 
-    document.getElementById('cancelExcelImportBtn').addEventListener('click', () => {
-      document.getElementById('excelPreviewCard').style.display = 'none';
+    safeAddListener('cancelExcelImportBtn', () => {
+      const card = document.getElementById('excelPreviewCard');
+      if (card) card.style.display = 'none';
     });
   }
 
@@ -3738,16 +3755,19 @@ function setupEventListeners() {
       if (el) el.addEventListener('change', renderAllViews);
     });
 
-    document.getElementById('resetFiltersBtn').addEventListener('click', () => {
-      document.getElementById('globalHammerFilter').value = 'ALL';
-      document.getElementById('globalShiftFilter').value = 'ALL';
-      document.getElementById('globalRangeFilter').value = '30';
+    safeAddListener('resetFiltersBtn', () => {
+      const hF = document.getElementById('globalHammerFilter');
+      const sF = document.getElementById('globalShiftFilter');
+      const rF = document.getElementById('globalRangeFilter');
+      if (hF) hF.value = 'ALL';
+      if (sF) sF.value = 'ALL';
+      if (rF) rF.value = 'ALL';
       selectedSubnavHammer = 'ALL';
       document.querySelectorAll('.subnav-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-hammer') === 'ALL'));
       renderAllViews();
     });
 
-    document.getElementById('logSearchInput').addEventListener('input', () => {
+    safeAddListener('logSearchInput', () => {
       renderLogsTable(getFilteredLogs());
     });
 
@@ -3929,24 +3949,29 @@ function setupEventListeners() {
       entryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const date = document.getElementById('entryDate').value;
-        const shift = document.getElementById('entryShift').value;
-        const hammer = document.getElementById('entryHammer').value;
-        const partNumber = document.getElementById('entryPartNumber').value.trim();
-        const plannedTimeMins = parseNum(document.getElementById('entryPlannedTime').value, 660);
-        const maintanceMins = parseNum(document.getElementById('entryMaintance').value);
-        const dieRelatedMins = parseNum(document.getElementById('entryDieRelated').value);
-        const setupMins = parseNum(document.getElementById('entrySetup').value);
-        const noManpowerMins = parseNum(document.getElementById('entryNoManpower').value);
-        const heatingTimeMins = parseNum(document.getElementById('entryHeatingTime').value);
-        const minorStopMins = parseNum(document.getElementById('entryMinorStop').value);
-        const totalParts = parseNum(document.getElementById('entryTotalParts').value);
-        const rejects = parseNum(document.getElementById('entryRejects').value);
+        const getVal = (id, def = '') => {
+          const el = document.getElementById(id);
+          return el ? el.value : def;
+        };
+
+        const date = getVal('entryDate');
+        const shift = getVal('entryShift', 'Shift A');
+        const hammer = getVal('entryMachine') || getVal('entryHammer') || '1 Ton Hammer';
+        const partNumber = (getVal('entryPart') || getVal('entryPartNumber') || 'A1#21').trim();
+        const plannedTimeMins = parseNum(getVal('entryPlannedTime', 660), 660);
+        const maintanceMins = parseNum(getVal('entryMaintance'));
+        const dieRelatedMins = parseNum(getVal('entryDieRelated'));
+        const setupMins = parseNum(getVal('entrySetup'));
+        const noManpowerMins = parseNum(getVal('entryNoManpower'));
+        const heatingTimeMins = parseNum(getVal('entryHeatingTime'));
+        const minorStopMins = parseNum(getVal('entryMinorStop'));
+        const totalParts = parseNum(getVal('entryTotalParts'));
+        const rejects = parseNum(getVal('entryRejects'));
         const goodParts = Math.max(0, totalParts - rejects);
-        const stage = document.getElementById('entryInspectionStage').value;
-        const reworkQty = parseNum(document.getElementById('entryReworkQty').value);
-        const reworkReason = document.getElementById('entryReworkReason').value.trim();
-        const rejectionReason = document.getElementById('entryRejectionReason').value.trim();
+        const stage = getVal('entryInspectionStage', 'Final Inspection');
+        const reworkQty = parseNum(getVal('entryReworkQty'));
+        const reworkReason = getVal('entryReworkReason').trim();
+        const rejectionReason = getVal('entryRejectionReason').trim();
 
         if (!date || !partNumber) {
           showToast('Please fill in Date and Part Number.', 'warning');
@@ -4033,8 +4058,8 @@ function setupEventListeners() {
       clearAllLogsBtn.addEventListener('click', wipeAllSystemDataCompletely);
     }
 
-    document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
-    document.getElementById('exportComparisonCsv').addEventListener('click', exportSummaryExcel);
+    safeAddListener('themeToggleBtn', 'click', toggleTheme);
+    safeAddListener('exportComparisonCsv', 'click', exportSummaryExcel);
   }
 
   function switchTab(tabId) {
